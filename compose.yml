@@ -1,0 +1,41 @@
+version: '3.9'
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Containerfile
+    ports:
+      - '8080:8000'  # Map host port 3000 to container port 8000 (Deno app)
+    depends_on:
+      - backend
+    networks:
+      - app-network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Containerfile
+    ports:
+      - '8000:8000'  # Map host port 8000 to container port 8000 (FastAPI app)
+    depends_on:
+      - neo4j
+    environment:
+      - NEO4J_URI=bolt://neo4j:7687
+      - NEO4J_USER=neo4j
+      - NEO4J_PASSWORD=neo4jpassword
+    networks:
+      - app-network
+
+  neo4j:
+    image: neo4j:latest
+    ports:
+      - '7474:7474'  # HTTP access
+      - '7687:7687'  # Bolt access
+    environment:
+      - NEO4J_AUTH=neo4j/neo4jpassword
+    networks:
+      - app-network
+
+networks:
+  app-network:
