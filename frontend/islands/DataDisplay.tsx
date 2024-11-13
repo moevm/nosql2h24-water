@@ -68,9 +68,23 @@ type DataCategory =
   | "lakes"
   | "support_requests";
 
+type FormData = {
+  email?: string;
+  avatar_url?: string;
+  description?: string;
+  availability?: number;
+  author?: string;
+  name?: string;
+  max_depth?: number;
+  salinity?: number;
+  subject?: string;
+  category: DataCategory;
+};
+
 export default function DataDisplay() {
   const [category, setCategory] = useState<DataCategory>("users");
   const [data, setData] = useState<DataItem[]>([]);
+  const [formData, setFormData] = useState<FormData>({ category: category });
 
   useEffect(() => {
     fetchData().catch(console.error);
@@ -84,6 +98,23 @@ export default function DataDisplay() {
     }
     const jsonData = await response.json();
     setData(jsonData);
+  };
+
+  const handleAddEntry = async () => {
+    const response = await fetch(`http://localhost:34567/${category}/new`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(formData),
+    });
+    if (!response.ok) {
+      console.error("Failed to add data");
+      return;
+    }
+    // Clear form and refresh data
+    setFormData({ category: category });
+    fetchData();
   };
 
   const renderTableHeaders = () => {
@@ -103,6 +134,19 @@ export default function DataDisplay() {
   };
 
   const renderTableRows = () => {
+    if (data.length === 0) {
+      return (
+        <tr>
+          <td
+            class="px-4 py-2 text-center"
+            colSpan={Object.keys(data[0] || {}).length || 1}
+          >
+            Нет данных
+          </td>
+        </tr>
+      );
+    }
+
     return data.map((item, index) => (
       <tr
         key={index}
@@ -131,19 +175,151 @@ export default function DataDisplay() {
     }
   };
 
+  const renderInputs = () => {
+    switch (category) {
+      case "users":
+        return (
+          <div class="mb-4">
+            <div class="mb-2">
+              <label class="block text-nord0 mb-1">Имя пользователя</label>
+              <input
+                type="email"
+                class="w-full text-nord0 border border-nord4 rounded px-2 py-1"
+                value={formData.name || ""}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    name: (e.target as HTMLInputElement).value,
+                  })}
+              />
+            </div>
+            <div class="mb-2">
+              <label class="block text-nord0 mb-1">Email</label>
+              <input
+                type="email"
+                class="w-full text-nord0 border border-nord4 rounded px-2 py-1"
+                value={formData.email || ""}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    email: (e.target as HTMLInputElement).value,
+                  })}
+              />
+            </div>
+          </div>
+        );
+      case "points":
+        return <div></div>;
+      case "routes":
+        return <div></div>;
+      case "lakes":
+        return (
+          <div class="mb-4">
+            <div class="mb-2">
+              <label class="block text-nord0 mb-1">Имя</label>
+              <input
+                type="text"
+                class="w-full text-nord0 border border-nord4 rounded px-2 py-1"
+                value={formData.name || ""}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    name: (e.target as HTMLInputElement).value,
+                  })}
+              />
+            </div>
+            <div class="mb-2">
+              <label class="block text-nord0 mb-1">Описание</label>
+              <textarea
+                class="w-full text-nord0 border border-nord4 rounded px-2 py-1"
+                value={formData.description || ""}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    description: (e.target as HTMLTextAreaElement).value,
+                  })}
+              />
+            </div>
+            <div class="mb-2">
+              <label class="block text-nord0 mb-1">Глубина</label>
+              <input
+                type="number"
+                step="any"
+                class="w-full text-nord0 border border-nord4 rounded px-2 py-1"
+                value={formData.max_depth !== undefined
+                  ? formData.max_depth
+                  : ""}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    max_depth: Number((e.target as HTMLInputElement).value),
+                  })}
+              />
+            </div>
+            <div>
+              <label class="block text-nord0 mb-1">Содержание соли</label>
+              <input
+                type="number"
+                step="any"
+                class="w-full text-nord0 border border-nord4 rounded px-2 py-1"
+                value={formData.salinity !== undefined ? formData.salinity : ""}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    salinity: Number((e.target as HTMLInputElement).value),
+                  })}
+              />
+            </div>
+          </div>
+        );
+      case "support_requests":
+        return (
+          <div class="mb-4">
+            <div class="mb-2">
+              <label class="block text-nord0 mb-1">Автор</label>
+              <input
+                type="text"
+                class="w-full text-nord0 border border-nord4 rounded px-2 py-1"
+                value={formData.author || ""}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    author: (e.target as HTMLInputElement).value,
+                  })}
+              />
+            </div>
+            <div>
+              <label class="block text-nord0 mb-1">Содержание</label>
+              <input
+                type="text"
+                class="w-full text-nord0 border border-nord4 rounded px-2 py-1"
+                value={formData.subject || ""}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    subject: (e.target as HTMLInputElement).value,
+                  })}
+              />
+            </div>
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <div class="p-4">
       <div class="mb-6">
-        <label class="text-nord6 font-semibold mr-2">
-          Select Data Category:
-        </label>
+        <label class="font-semibold mr-2">Выберите категорию:</label>
         <select
-          class="bg-nord0 text-nord6 border border-nord4 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-nord8"
+          class="bg-nord6 text-nord0 border border-nord4 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-nord8 w-64"
           value={category}
-          onChange={(e) =>
-            setCategory(
-              (e.target as HTMLSelectElement).value as DataCategory,
-            )}
+          onChange={(e) => {
+            setCategory((e.target as HTMLSelectElement).value as DataCategory);
+            setFormData({ category: category });
+            fetchData();
+          }}
         >
           <option value="users">Пользователи</option>
           <option value="points">Точки</option>
@@ -152,11 +328,21 @@ export default function DataDisplay() {
           <option value="support_requests">Обращения в поддержку</option>
         </select>
       </div>
+
+      {/* Input fields for adding entries */}
+      {renderInputs()}
+
+      {/* Button to add entry */}
+      <button
+        onClick={handleAddEntry}
+        class="bg-nord8 text-nord0 px-3 py-1 rounded focus:outline-none focus:ring-2 focus:ring-nord8 mb-6"
+      >
+        Добавить
+      </button>
+
       <div class="overflow-auto rounded-lg shadow">
-        <table class="min-w-full table-auto bg-nord0 text-nord6">
-          <thead class="bg-nord3">
-            {renderTableHeaders()}
-          </thead>
+        <table class="min-w-full table-auto bg-nord5 text-nord0">
+          <thead class="bg-nord4">{renderTableHeaders()}</thead>
           <tbody>{renderTableRows()}</tbody>
         </table>
       </div>
