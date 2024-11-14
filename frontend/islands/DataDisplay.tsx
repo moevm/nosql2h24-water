@@ -1,4 +1,4 @@
-import { useEffect, useState } from "preact/hooks";
+import { Dispatch, StateUpdater, useEffect, useState } from "preact/hooks";
 
 interface GeoJSONPoint {
   type: "Point";
@@ -81,7 +81,7 @@ type FormData = {
   subject?: string;
 };
 
-export default function DataDisplay() {
+function DataDisplay() {
   const [category, setCategory] = useState<DataCategory>("users");
   const [data, setData] = useState<DataItem[]>([]);
   const [formData, setFormData] = useState<FormData>({});
@@ -92,11 +92,14 @@ export default function DataDisplay() {
   }, [category]);
 
   const fetchData = async () => {
+    setData([]);
+
     const response = await fetch(`http://localhost:8000/${category}`);
     if (!response.ok) {
       console.error("Failed to fetch data");
       return;
     }
+
     const jsonData = await response.json();
     setData(jsonData);
   };
@@ -118,70 +121,10 @@ export default function DataDisplay() {
     fetchData();
   };
 
-  const renderTableHeaders = () => {
-    if (data.length === 0) return null;
-    return (
-      <tr>
-        {Object.keys(data[0]).map((key) => (
-          <th
-            key={key}
-            class="px-4 py-2 border-b-2 border-nord4 text-left uppercase tracking-wider"
-          >
-            {key.replace(/_/g, " ")}
-          </th>
-        ))}
-      </tr>
-    );
-  };
-
-  const renderTableRows = () => {
-    if (data.length === 0) {
-      return (
-        <tr>
-          <td
-            class="px-4 py-2 text-center"
-            colSpan={Object.keys(data[0] || {}).length || 1}
-          >
-            Нет данных
-          </td>
-        </tr>
-      );
-    }
-
-    return data.map((item, index) => (
-      <tr
-        key={index}
-        class={`${
-          index % 2 === 0 ? "bg-nord4" : "bg-nord5"
-        } hover:bg-nord6 hover:rounded`}
-      >
-        {Object.values(item).map((value, i) => (
-          <td key={i} class="px-4 py-2 border-b border-nord4">
-            {renderCellValue(value)}
-          </td>
-        ))}
-      </tr>
-    ));
-  };
-
-  const renderCellValue = (value: unknown) => {
-    if (value === null || value === undefined) {
-      return "";
-    } else if (typeof value === "string" || typeof value === "number") {
-      return value;
-    } else if (Array.isArray(value)) {
-      return value.join(", ");
-    } else if (typeof value === "object") {
-      return JSON.stringify(value);
-    } else {
-      return String(value);
-    }
-  };
-
   const addUserForm = () => {
     return (
       <div>
-        {renderInputs()}
+        {renderInputs(category, formData, setFormData)}
 
         <button
           onClick={handleAddEntry}
@@ -193,143 +136,9 @@ export default function DataDisplay() {
     );
   };
 
-  const renderInputs = () => {
-    switch (category) {
-      case "users":
-        return (
-          <div class="mb-4">
-            <div class="mb-2">
-              <label class="block text-nord0 mb-1">Имя пользователя</label>
-              <input
-                type="email"
-                class="w-full text-nord0 border border-nord4 rounded px-2 py-1"
-                value={formData.name || ""}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    name: (e.target as HTMLInputElement).value,
-                  })}
-              />
-            </div>
-            <div class="mb-2">
-              <label class="block text-nord0 mb-1">Email</label>
-              <input
-                type="email"
-                class="w-full text-nord0 border border-nord4 rounded px-2 py-1"
-                value={formData.email || ""}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    email: (e.target as HTMLInputElement).value,
-                  })}
-              />
-            </div>
-          </div>
-        );
-      case "points":
-        return <div></div>;
-      case "routes":
-        return <div></div>;
-      case "lakes":
-        return (
-          <div class="mb-4">
-            <div class="mb-2">
-              <label class="block text-nord0 mb-1">Имя</label>
-              <input
-                type="text"
-                class="w-full text-nord0 border border-nord4 rounded px-2 py-1"
-                value={formData.name || ""}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    name: (e.target as HTMLInputElement).value,
-                  })}
-              />
-            </div>
-            <div class="mb-2">
-              <label class="block text-nord0 mb-1">Описание</label>
-              <textarea
-                class="w-full text-nord0 border border-nord4 rounded px-2 py-1"
-                value={formData.description || ""}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    description: (e.target as HTMLTextAreaElement).value,
-                  })}
-              />
-            </div>
-            <div class="mb-2">
-              <label class="block text-nord0 mb-1">Глубина</label>
-              <input
-                type="number"
-                step="any"
-                class="w-full text-nord0 border border-nord4 rounded px-2 py-1"
-                value={formData.max_depth !== undefined
-                  ? formData.max_depth
-                  : ""}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    max_depth: Number((e.target as HTMLInputElement).value),
-                  })}
-              />
-            </div>
-            <div>
-              <label class="block text-nord0 mb-1">Содержание соли</label>
-              <input
-                type="number"
-                step="any"
-                class="w-full text-nord0 border border-nord4 rounded px-2 py-1"
-                value={formData.salinity !== undefined ? formData.salinity : ""}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    salinity: Number((e.target as HTMLInputElement).value),
-                  })}
-              />
-            </div>
-          </div>
-        );
-      case "support-requests":
-        return (
-          <div class="mb-4">
-            <div class="mb-2">
-              <label class="block text-nord0 mb-1">Автор</label>
-              <input
-                type="text"
-                class="w-full text-nord0 border border-nord4 rounded px-2 py-1"
-                value={formData.author || ""}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    author: (e.target as HTMLInputElement).value,
-                  })}
-              />
-            </div>
-            <div>
-              <label class="block text-nord0 mb-1">Содержание</label>
-              <input
-                type="text"
-                class="w-full text-nord0 border border-nord4 rounded px-2 py-1"
-                value={formData.subject || ""}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    subject: (e.target as HTMLInputElement).value,
-                  })}
-              />
-            </div>
-          </div>
-        );
-      default:
-        return null;
-    }
-  };
-
   return (
     <div class="p-4">
       <div class="flex items-center space-x-2 md:space-x-4 px-3 mb-6 h-10">
-        <label class="font-semibold mr-2">Выберите категорию:</label>
         <select
           class="bg-nord6 text-nord0 border border-nord4 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-nord8 w-64"
           value={category}
@@ -382,10 +191,242 @@ export default function DataDisplay() {
 
       <div class="overflow-auto rounded-lg shadow">
         <table class="min-w-full table-auto bg-nord5 text-nord0">
-          <thead class="bg-nord7">{renderTableHeaders()}</thead>
-          <tbody class="bg-nord4">{renderTableRows()}</tbody>
+          <thead class="bg-nord7">{renderTableHeaders(data)}</thead>
+          <tbody class="bg-nord4">{renderTableRows(data)}</tbody>
         </table>
       </div>
     </div>
   );
 }
+
+function renderTableHeaders(data: DataItem[]) {
+  if (data.length === 0) return null;
+  return (
+    <tr>
+      {Object.keys(data[0]).map((key) => (
+        <th
+          key={key}
+          class="px-4 py-2 border-b-2 border-nord4 text-left uppercase tracking-wider"
+        >
+          {key.replace(/_/g, " ")}
+        </th>
+      ))}
+    </tr>
+  );
+}
+
+function renderTableRows(data: DataItem[]) {
+  if (data.length === 0) {
+    return (
+      <tr>
+        <td
+          class="px-4 py-2 text-center"
+          colSpan={Object.keys(data[0] || {}).length || 1}
+        >
+          Нет данных
+        </td>
+      </tr>
+    );
+  }
+
+  return data.map((item: DataItem, index: number) => (
+    <tr
+      key={index}
+      class={`${
+        index % 2 === 0 ? "bg-nord4" : "bg-nord5"
+      } hover:bg-nord6 hover:rounded`}
+    >
+      {Object.values(item).map((value, i) => (
+        <td key={i} class="px-4 py-2 border-b border-nord4">
+          {renderCellValue(value)}
+        </td>
+      ))}
+    </tr>
+  ));
+}
+
+function renderCellValue(value: unknown) {
+  if (value === null || value === undefined) {
+    return "";
+  } else if (typeof value === "string" || typeof value === "number") {
+    return value;
+  } else if (Array.isArray(value)) {
+    return value.join(", ");
+  } else if (typeof value === "object") {
+    return JSON.stringify(value);
+  } else {
+    return String(value);
+  }
+}
+
+function renderInputs(
+  category: DataCategory,
+  formData: FormData,
+  setFormData: Dispatch<StateUpdater<FormData>>,
+) {
+  switch (category) {
+    case "users":
+      return renderUsersInput(formData, setFormData);
+    case "points":
+      return renderPointsInput(formData, setFormData);
+    case "routes":
+      return renderRoutesInput(formData, setFormData);
+    case "lakes":
+      return renderLakesInput(formData, setFormData);
+    case "support-requests":
+      return renderSupportRequestsInput(formData, setFormData);
+    default:
+      return null;
+  }
+}
+
+function renderUsersInput(
+  formData: FormData,
+  setFormData: Dispatch<StateUpdater<FormData>>,
+) {
+  return (
+    <div class="mb-4">
+      <div class="mb-2">
+        <label class="block text-nord0 mb-1">Имя пользователя</label>
+        <input
+          type="email"
+          class="w-full text-nord0 border border-nord4 rounded px-2 py-1"
+          value={formData.name || ""}
+          onChange={(e) =>
+            setFormData({
+              ...formData,
+              name: (e.target as HTMLInputElement).value,
+            })}
+        />
+      </div>
+      <div class="mb-2">
+        <label class="block text-nord0 mb-1">Email</label>
+        <input
+          type="email"
+          class="w-full text-nord0 border border-nord4 rounded px-2 py-1"
+          value={formData.email || ""}
+          onChange={(e) =>
+            setFormData({
+              ...formData,
+              email: (e.target as HTMLInputElement).value,
+            })}
+        />
+      </div>
+    </div>
+  );
+}
+
+function renderPointsInput(
+  formData: FormData,
+  setFormData: Dispatch<StateUpdater<FormData>>,
+) {
+  return <div></div>;
+}
+
+function renderRoutesInput(
+  formData: FormData,
+  setFormData: Dispatch<StateUpdater<FormData>>,
+) {
+  return <div></div>;
+}
+
+function renderLakesInput(
+  formData: FormData,
+  setFormData: Dispatch<StateUpdater<FormData>>,
+) {
+  return (
+    <div class="mb-4">
+      <div class="mb-2">
+        <label class="block text-nord0 mb-1">Имя</label>
+        <input
+          type="text"
+          class="w-full text-nord0 border border-nord4 rounded px-2 py-1"
+          value={formData.name || ""}
+          onChange={(e) =>
+            setFormData({
+              ...formData,
+              name: (e.target as HTMLInputElement).value,
+            })}
+        />
+      </div>
+      <div class="mb-2">
+        <label class="block text-nord0 mb-1">Описание</label>
+        <textarea
+          class="w-full text-nord0 border border-nord4 rounded px-2 py-1"
+          value={formData.description || ""}
+          onChange={(e) =>
+            setFormData({
+              ...formData,
+              description: (e.target as HTMLTextAreaElement).value,
+            })}
+        />
+      </div>
+      <div class="mb-2">
+        <label class="block text-nord0 mb-1">Глубина</label>
+        <input
+          type="number"
+          step="any"
+          class="w-full text-nord0 border border-nord4 rounded px-2 py-1"
+          value={formData.max_depth !== undefined ? formData.max_depth : ""}
+          onChange={(e) =>
+            setFormData({
+              ...formData,
+              max_depth: Number((e.target as HTMLInputElement).value),
+            })}
+        />
+      </div>
+      <div>
+        <label class="block text-nord0 mb-1">Содержание соли</label>
+        <input
+          type="number"
+          step="any"
+          class="w-full text-nord0 border border-nord4 rounded px-2 py-1"
+          value={formData.salinity !== undefined ? formData.salinity : ""}
+          onChange={(e) =>
+            setFormData({
+              ...formData,
+              salinity: Number((e.target as HTMLInputElement).value),
+            })}
+        />
+      </div>
+    </div>
+  );
+}
+
+function renderSupportRequestsInput(
+  formData: FormData,
+  setFormData: Dispatch<StateUpdater<FormData>>,
+) {
+  return (
+    <div class="mb-4">
+      <div class="mb-2">
+        <label class="block text-nord0 mb-1">Автор</label>
+        <input
+          type="text"
+          class="w-full text-nord0 border border-nord4 rounded px-2 py-1"
+          value={formData.author || ""}
+          onChange={(e) =>
+            setFormData({
+              ...formData,
+              author: (e.target as HTMLInputElement).value,
+            })}
+        />
+      </div>
+      <div>
+        <label class="block text-nord0 mb-1">Содержание</label>
+        <input
+          type="text"
+          class="w-full text-nord0 border border-nord4 rounded px-2 py-1"
+          value={formData.subject || ""}
+          onChange={(e) =>
+            setFormData({
+              ...formData,
+              subject: (e.target as HTMLInputElement).value,
+            })}
+        />
+      </div>
+    </div>
+  );
+}
+
+export default DataDisplay;
