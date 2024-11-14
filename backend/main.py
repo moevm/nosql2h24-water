@@ -80,7 +80,7 @@ class NewUserRequest(BaseModel):
 
 
 @app.post("/users/new")
-def create_user(user_request: NewUserRequest):
+def create_user(user_request: NewUserRequest) -> None:
     timestamp = datetime.now(timezone.utc)
     new_id = uuid.uuid4()
 
@@ -116,7 +116,7 @@ def create_user(user_request: NewUserRequest):
 
 
 @app.get("/users/{user_id}", response_model=User)
-def get_user(user_id: str):
+def get_user(user_id: str) -> User:
     query = """
     MATCH (u:User {id: $user_id})
     RETURN u
@@ -124,11 +124,19 @@ def get_user(user_id: str):
 
     with driver.session() as session:
         result = session.run(query, {"user_id": user_id})
-        if result:
-            user = result['u'][0]
-            return User(user)
+        data = result['u'][0]
 
-    return {}
+    if not data:
+        raise HTTPException(404, "User not found")
+
+    return User(
+        id=UUID4(data[id]),
+        name=data['name'],
+        email=data['email'],
+        registration_date=data['registration_date'].to_native(),
+        profile_update_date=data['profile_update_date'].to_native(),
+        avatar_url=data['avatar_url'],
+    )
 
 
 @app.get("/users", response_model=List[User])
@@ -143,7 +151,6 @@ def list_users() -> List[User]:
         for record in session.run(query):
             data = record['u']
 
-            print(data)
             user = User(
                 id=UUID4(data['id']),
                 name=data['name'],
