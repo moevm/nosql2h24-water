@@ -1,11 +1,11 @@
+import DataDisplay from "../islands/DataDisplay.tsx";
 import Layout from "../islands/Layout.tsx";
-import Map from "../islands/Map.tsx";
 
-export default function Home() {
+export default function Admin() {
   return (
     <div>
       <Layout>
-        <Map />
+        <DataDisplay />
       </Layout>
     </div>
   );
