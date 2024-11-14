@@ -1,10 +1,15 @@
-import { FunctionalComponent } from "preact";
 import { useState } from "preact/hooks";
 import Navbar from "./Navbar.tsx";
 import Sidebar from "./Sidebar.tsx";
-import DataDisplay from "./DataDisplay.tsx";
+import { FunctionalComponent } from "preact";
 
-const Layout: FunctionalComponent = () => {
+interface Props {
+  children?: preact.ComponentChildren;
+}
+
+const Layout: FunctionalComponent<Props> = (
+  { children },
+) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const handleToggleSidebar = () => {
@@ -18,7 +23,7 @@ const Layout: FunctionalComponent = () => {
         isSidebarOpen={isSidebarOpen}
         setIsSidebarOpen={setIsSidebarOpen}
       >
-        <DataDisplay />
+        {children}
       </Sidebar>
     </>
   );
