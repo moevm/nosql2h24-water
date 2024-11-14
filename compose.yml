@@ -6,7 +6,9 @@ services:
       context: ./frontend
       dockerfile: Containerfile
     ports:
-      - '8080:8000'  # Map host port 3000 to container port 8000 (Deno app)
+      - '8080:8000'  # Map host port 8080 to container port 8000 (Deno app)
+    volumes:
+      - ./frontend:/app  # Mount the local frontend directory to /app in the container
     depends_on:
       - backend
     networks:
@@ -18,6 +20,8 @@ services:
       dockerfile: Containerfile
     ports:
       - '8000:8000'  # Map host port 8000 to container port 8000 (FastAPI app)
+    volumes:
+      - ./backend:/app  # Mount the local backend directory to /app in the container
     depends_on:
       - neo4j
     environment:
@@ -32,10 +36,19 @@ services:
     ports:
       - '7474:7474'  # HTTP access
       - '7687:7687'  # Bolt access
+    volumes:
+      - neo4j_data:/data  # Persist database data
+      - neo4j_logs:/logs  # Persist database logs
     environment:
       - NEO4J_AUTH=neo4j/neo4jpassword
+      - NEO4J_server_default__listen__address=0.0.0.0
+      - NEO4J_server_default__advertised__address=neo4j
     networks:
       - app-network
+
+volumes:
+  neo4j_data:
+  neo4j_logs:
 
 networks:
   app-network:
