@@ -4,7 +4,7 @@ import { useEffect } from "preact/hooks";
 interface SidebarProps {
   isSidebarOpen: boolean;
   setIsSidebarOpen: (value: boolean) => void;
-  children: preact.ComponentChildren;
+  children?: preact.ComponentChildren;
 }
 
 const Sidebar: FunctionalComponent<SidebarProps> = (
@@ -76,7 +76,7 @@ const Sidebar: FunctionalComponent<SidebarProps> = (
 
       {/* Main Content */}
       <div class="flex-1 flex flex-col">
-        <main class="flex-1 p-4">{children}</main>
+        <main class="flex-1">{children}</main>
       </div>
     </div>
   );
