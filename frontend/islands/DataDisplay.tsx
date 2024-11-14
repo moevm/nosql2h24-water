@@ -12,6 +12,7 @@ interface GeoJSONPolygon {
 
 interface User {
   id: string;
+  name: string;
   email: string;
   registration_date: string;
   profile_update_date: string;
@@ -66,7 +67,7 @@ type DataCategory =
   | "points"
   | "routes"
   | "lakes"
-  | "support_requests";
+  | "support-requests";
 
 type FormData = {
   email?: string;
@@ -78,20 +79,20 @@ type FormData = {
   max_depth?: number;
   salinity?: number;
   subject?: string;
-  category: DataCategory;
 };
 
 export default function DataDisplay() {
   const [category, setCategory] = useState<DataCategory>("users");
   const [data, setData] = useState<DataItem[]>([]);
-  const [formData, setFormData] = useState<FormData>({ category: category });
+  const [formData, setFormData] = useState<FormData>({});
+  const [addShown, setAddShown] = useState<boolean>(false);
 
   useEffect(() => {
     fetchData().catch(console.error);
   }, [category]);
 
   const fetchData = async () => {
-    const response = await fetch(`http://localhost:34567/${category}`);
+    const response = await fetch(`http://localhost:8000/${category}`);
     if (!response.ok) {
       console.error("Failed to fetch data");
       return;
@@ -101,7 +102,7 @@ export default function DataDisplay() {
   };
 
   const handleAddEntry = async () => {
-    const response = await fetch(`http://localhost:34567/${category}/new`, {
+    const response = await fetch(`http://localhost:8000/${category}/new`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -113,7 +114,7 @@ export default function DataDisplay() {
       return;
     }
     // Clear form and refresh data
-    setFormData({ category: category });
+    setFormData({});
     fetchData();
   };
 
@@ -150,7 +151,9 @@ export default function DataDisplay() {
     return data.map((item, index) => (
       <tr
         key={index}
-        class={`${index % 2 === 0 ? "bg-nord0" : "bg-nord1"} hover:bg-nord2`}
+        class={`${
+          index % 2 === 0 ? "bg-nord4" : "bg-nord5"
+        } hover:bg-nord6 hover:rounded`}
       >
         {Object.values(item).map((value, i) => (
           <td key={i} class="px-4 py-2 border-b border-nord4">
@@ -173,6 +176,21 @@ export default function DataDisplay() {
     } else {
       return String(value);
     }
+  };
+
+  const addUserForm = () => {
+    return (
+      <div>
+        {renderInputs()}
+
+        <button
+          onClick={handleAddEntry}
+          class="bg-nord8 text-nord0 px-3 py-1 rounded focus:outline-none focus:ring-2 focus:ring-nord8 mb-6"
+        >
+          Добавить
+        </button>
+      </div>
+    );
   };
 
   const renderInputs = () => {
@@ -272,7 +290,7 @@ export default function DataDisplay() {
             </div>
           </div>
         );
-      case "support_requests":
+      case "support-requests":
         return (
           <div class="mb-4">
             <div class="mb-2">
@@ -310,14 +328,16 @@ export default function DataDisplay() {
 
   return (
     <div class="p-4">
-      <div class="mb-6">
+      <div class="flex items-center space-x-2 md:space-x-4 px-3 mb-6 h-10">
         <label class="font-semibold mr-2">Выберите категорию:</label>
         <select
           class="bg-nord6 text-nord0 border border-nord4 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-nord8 w-64"
           value={category}
           onChange={(e) => {
-            setCategory((e.target as HTMLSelectElement).value as DataCategory);
-            setFormData({ category: category });
+            setCategory(
+              (e.target as HTMLSelectElement).value as DataCategory,
+            );
+            setFormData({});
             fetchData();
           }}
         >
@@ -325,28 +345,47 @@ export default function DataDisplay() {
           <option value="points">Точки</option>
           <option value="routes">Маршруты</option>
           <option value="lakes">Озера</option>
-          <option value="support_requests">Обращения в поддержку</option>
+          <option value="support-requests">Обращения в поддержку</option>
         </select>
+        <button
+          class="flex items-center justify-center w-10 h-10 text-nord0 rounded hover:bg-nord5"
+          onClick={() => {
+            setAddShown(!addShown);
+          }}
+        >
+          {addShown
+            ? (
+              <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M18 15l-6-6-6 6"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            )
+            : (
+              <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M12 5v14M5 12h14"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                />
+              </svg>
+            )}
+        </button>
       </div>
 
-      {/* Input fields for adding entries */}
-      {renderInputs()}
-
-      {/* Button to add entry */}
-      <button
-        onClick={handleAddEntry}
-        class="bg-nord8 text-nord0 px-3 py-1 rounded focus:outline-none focus:ring-2 focus:ring-nord8 mb-6"
-      >
-        Добавить
-      </button>
+      {addShown && addUserForm()}
 
       <div class="overflow-auto rounded-lg shadow">
         <table class="min-w-full table-auto bg-nord5 text-nord0">
-          <thead class="bg-nord4">{renderTableHeaders()}</thead>
-          <tbody>{renderTableRows()}</tbody>
+          <thead class="bg-nord7">{renderTableHeaders()}</thead>
+          <tbody class="bg-nord4">{renderTableRows()}</tbody>
         </table>
       </div>
     </div>
   );
 }
-
