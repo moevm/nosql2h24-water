@@ -18,13 +18,6 @@ NEO4J_PASSWORD = os.getenv('NEO4J_PASSWORD', 'neo4j')
 driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
 
 
-class Point(BaseModel):
-    id: str
-    coordinates: dict
-    description: str
-    availability: float
-
-
 class Route(BaseModel):
     id: str
     points: List[str]
@@ -79,13 +72,12 @@ class NewUserRequest(BaseModel):
     email: str
 
 
-@app.post("/users/new")
-def create_user(user_request: NewUserRequest) -> None:
+@app.post("/users/new", response_model=str)
+def create_user(user_request: NewUserRequest) -> str:
     timestamp = datetime.now(timezone.utc)
-    new_id = uuid.uuid4()
 
     user = User(
-        id=new_id,
+        id=uuid.uuid4(),
         name=user_request.name,
         email=user_request.email,
         registration_date=timestamp,
@@ -106,13 +98,15 @@ def create_user(user_request: NewUserRequest) -> None:
        """
 
     user_prepared = user.dict()
-    user_prepared["id"] = user_prepared["id"].hex
+    user_prepared["id"] = user_prepared.id.hex
 
     with driver.session() as session:
-        result = session.run(query, user_prepared)
-        if not result.data():
-            raise HTTPException(status_code=500,
-                                detail="Failed to create user")
+        result = session.run(query, user_prepared).single()
+
+    if not result:
+        raise HTTPException(status_code=500, detail="Failed to create user")
+
+    return result['u']['id']
 
 
 @app.get("/users/{user_id}", response_model=User)
@@ -123,8 +117,9 @@ def get_user(user_id: str) -> User:
     """
 
     with driver.session() as session:
-        result = session.run(query, {"user_id": user_id})
-        data = result['u'][0]
+        data = session \
+                .run(query, {"user_id": user_id}) \
+                .single()['u']
 
     if not data:
         raise HTTPException(404, "User not found")
@@ -165,27 +160,109 @@ def list_users() -> List[User]:
     return users
 
 
+class Point(BaseModel):
+    id: UUID4
+    coordinates: dict
+    description: str
+    availability: float
+
+
+class CreatePointRequest(BaseModel):
+    coordinates: dict
+    description: str
+    availability: float
+
+
+@app.post("/points/new", response_model=str)
+def create_point(req: CreatePointRequest) -> str:
+    point = Point(
+        id=uuid.uuid4(),
+        coordinates=req.coordinates,
+        description=req.description,
+        availability=req.availability,
+    )
+
+    query = """
+       CREATE (p:Point {
+           id: $id,
+           coordinates: point({latitude: $lat, longitude: $lon}),
+           description: $description,
+           availability: $availability
+       })
+       RETURN p
+       """
+
+    point_prepared = point.dict()
+    point_prepared["id"] = point.id.hex
+    point_prepared["lat"] = point.coordinates["coordinates"][0]
+    point_prepared["lon"] = point.coordinates["coordinates"][1]
+
+    with driver.session() as session:
+        data = session.run(query, point_prepared).single()
+
+    if not data:
+        raise HTTPException(status_code=500, detail="Failed to create point")
+
+    return data['p']['id']
+
+
 @app.get("/points/{point_id}", response_model=Point)
-def get_point(point_id: str):
+def get_point(point_id: str) -> Point:
     query = """
     MATCH (p:Point {id: $point_id})
     RETURN p
     """
-    result = run_query(query, {"point_id": point_id})
-    if result:
-        point = result[0]['p']
-        return Point(**point)
-    return {}
+
+    with driver.session() as session:
+        data = session \
+                .run(query, {"point_id": point_id}) \
+                .single()['p']
+
+    if not data:
+        raise HTTPException(status_code=404, detail="Failed to find point")
+
+    return Point(
+        id=UUID4(data['id']),
+        coordinates={
+            "type": "Point",
+            "coordinates": [
+                data['coordinates'][0],
+                data['coordinates'][1],
+            ],
+        },
+        description=data['description'],
+        availability=float(data['availability']),
+    )
 
 
 @app.get("/points", response_model=List[Point])
-def list_points():
+def list_points() -> List[Point]:
     query = """
     MATCH (p:Point)
     RETURN p
     """
-    result = run_query(query)
-    points = [Point(**record['p']) for record in result]
+
+    points = []
+    with driver.session() as session:
+        for record in session.run(query):
+            data = record['p']
+
+            point = Point(
+                id=UUID4(data['id']),
+                coordinates={
+                    "type":
+                    "Point",
+                    "coordinates": [
+                        data['coordinates'][0],
+                        data['coordinates'][1],
+                    ],
+                },
+                description=data['description'],
+                availability=float(data['availability']),
+            )
+
+            points.append(point)
+
     return points
 
 
@@ -282,25 +359,6 @@ def list_support_requests():
         ]
         support_requests.append(SupportRequest(**support_request))
     return support_requests
-
-
-@app.post("/points/new", response_model=Point)
-def create_point(point: Point):
-    query = """
-       CREATE (p:Point {
-           id: $id,
-           coordinates: $coordinates,
-           description: $description,
-           availability: $availability
-       })
-       RETURN p
-       """
-    result = run_query(query, point.dict())
-    if result:
-        point_data = result[0]['p']
-        return Point(**point_data)
-    else:
-        raise HTTPException(status_code=500, detail="Failed to create point")
 
 
 @app.post("/routes/new", response_model=Route)

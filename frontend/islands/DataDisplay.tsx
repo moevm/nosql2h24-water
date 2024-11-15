@@ -1,14 +1,8 @@
 import { Dispatch, StateUpdater, useEffect, useState } from "preact/hooks";
-
-interface GeoJSONPoint {
-  type: "Point";
-  coordinates: [number, number];
-}
-
-interface GeoJSONPolygon {
-  type: "Polygon";
-  coordinates: Array<Array<[number, number]>>;
-}
+import {
+  Point as GeoJsonPoint,
+  Polygon as GeoJsonPolygon,
+} from "npm:@types/geojson";
 
 interface User {
   id: string;
@@ -21,7 +15,7 @@ interface User {
 
 interface Point {
   id: string;
-  coordinates: GeoJSONPoint;
+  coordinates: GeoJsonPoint;
   description: string;
   availability: number;
 }
@@ -37,18 +31,12 @@ interface Lake {
   id: string;
   name: string;
   description: string;
-  coordinates_boundary: GeoJSONPolygon;
+  coordinates_boundary: GeoJsonPolygon;
   availability_score: number;
   max_depth: number;
   inflowing_rivers: string[];
   outflowing_rivers: string[];
   salinity: number;
-}
-
-interface SupportRequestReview {
-  text: string;
-  date: string;
-  photo: string;
 }
 
 interface SupportRequest {
@@ -57,10 +45,13 @@ interface SupportRequest {
   route_reference?: string;
   lake_reference?: string;
   subject: string;
-  reviews: SupportRequestReview[];
+  text: string;
+  date: string;
+  photo: string;
 }
 
 type DataItem = User | Point | Route | Lake | SupportRequest;
+type DataCell = string | number | string[] | GeoJsonPoint | GeoJsonPolygon;
 
 type DataCategory =
   | "users"
@@ -79,13 +70,14 @@ type FormData = {
   max_depth?: number;
   salinity?: number;
   subject?: string;
+  coordinates?: GeoJsonPoint;
 };
 
 function DataDisplay() {
   const [category, setCategory] = useState<DataCategory>("users");
   const [data, setData] = useState<DataItem[]>([]);
   const [formData, setFormData] = useState<FormData>({});
-  const [addShown, setAddShown] = useState<boolean>(false);
+  const [addEntryShown, setAddEntryShown] = useState<boolean>(false);
 
   useEffect(() => {
     fetchData().catch(console.error);
@@ -121,7 +113,7 @@ function DataDisplay() {
     fetchData();
   };
 
-  const addUserForm = () => {
+  const addEntryForm = () => {
     return (
       <div>
         {renderInputs(category, formData, setFormData)}
@@ -159,10 +151,10 @@ function DataDisplay() {
         <button
           class="flex items-center justify-center w-10 h-10 text-nord0 rounded hover:bg-nord5"
           onClick={() => {
-            setAddShown(!addShown);
+            setAddEntryShown(!addEntryShown);
           }}
         >
-          {addShown
+          {addEntryShown
             ? (
               <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none">
                 <path
@@ -187,7 +179,7 @@ function DataDisplay() {
         </button>
       </div>
 
-      {addShown && addUserForm()}
+      {addEntryShown && addEntryForm()}
 
       <div class="overflow-auto rounded-lg shadow">
         <table class="min-w-full table-auto bg-nord5 text-nord0">
@@ -245,13 +237,25 @@ function renderTableRows(data: DataItem[]) {
   ));
 }
 
-function renderCellValue(value: unknown) {
+function renderCellValue(value: DataCell) {
+  const formatCoordinates = (num: number) => {
+    const formatted = num.toFixed(6);
+    const parts = formatted.split(".");
+    parts[0] = parts[0].padStart(2, "0");
+    return parts.join(".");
+  };
+
   if (value === null || value === undefined) {
     return "";
   } else if (typeof value === "string" || typeof value === "number") {
     return value;
   } else if (Array.isArray(value)) {
     return value.join(", ");
+  } else if (value?.type === "Point") {
+    return [
+      formatCoordinates(value.coordinates[0]),
+      formatCoordinates(value.coordinates[1]),
+    ].join(" ");
   } else if (typeof value === "object") {
     return JSON.stringify(value);
   } else {
@@ -320,7 +324,83 @@ function renderPointsInput(
   formData: FormData,
   setFormData: Dispatch<StateUpdater<FormData>>,
 ) {
-  return <div></div>;
+  return (
+    <div class="mb-4">
+      <label class="block mb-1">Координаты точки</label>
+      <div class="mb-2 flex items-center space-x-2">
+        <input
+          class="w-full text-nord0 border border-nord4 rounded px-2 py-1"
+          type="number"
+          step="0.000001"
+          placeholder="00.000000"
+          value={formData.coordinates?.coordinates.at(0) || ""}
+          onChange={(e) => {
+            setFormData({
+              ...formData,
+              coordinates: {
+                type: "Point",
+                coordinates: [
+                  Number(
+                    (e.target as HTMLInputElement).value,
+                  ),
+                  formData.coordinates?.coordinates.at(1) || 0.0,
+                ],
+              },
+            });
+          }}
+        />
+        <input
+          class="w-full text-nord0 border border-nord4 rounded px-2 py-1"
+          type="number"
+          step="0.000001"
+          placeholder="00.000000"
+          value={formData.coordinates?.coordinates.at(1) || ""}
+          onChange={(e) => {
+            setFormData({
+              ...formData,
+              coordinates: {
+                type: "Point",
+                coordinates: [
+                  formData.coordinates?.coordinates.at(0) || 0.0,
+                  Number(
+                    (e.target as HTMLInputElement).value,
+                  ),
+                ],
+              },
+            });
+          }}
+        />
+      </div>
+      <div>
+        <label class="block text-nord0 mb-1">Индекс доступности</label>
+        <input
+          type="number"
+          placeholder="1.0"
+          step="0.1"
+          class="w-full text-nord0 border border-nord4 rounded px-2 py-1"
+          value={formData.availability || ""}
+          onChange={(e) =>
+            setFormData({
+              ...formData,
+              availability: Number((e.target as HTMLInputElement).value),
+            })}
+        />
+      </div>
+      <div class="mb-2">
+        <label class="block text-nord0 mb-1">Описание</label>
+        <textarea
+          placeholder="Описание точки..."
+          class="w-full text-nord0 border border-nord4 rounded px-2 py-1"
+          value={formData.description || ""}
+          onChange={(e) =>
+            setFormData({
+              ...formData,
+              description: (e.target as HTMLTextAreaElement).value,
+            })}
+        />
+      </div>
+    </div>
+  );
 }
 
 function renderRoutesInput(
