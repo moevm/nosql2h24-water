@@ -9,8 +9,6 @@ import * as $index from "./routes/index.tsx";
 import * as $DataDisplay from "./islands/DataDisplay.tsx";
 import * as $Layout from "./islands/Layout.tsx";
 import * as $Map from "./islands/Map.tsx";
-import * as $Navbar from "./islands/Navbar.tsx";
-import * as $Sidebar from "./islands/Sidebar.tsx";
 import type { Manifest } from "$fresh/server.ts";
 
 const manifest = {
@@ -24,8 +22,6 @@ const manifest = {
     "./islands/DataDisplay.tsx": $DataDisplay,
     "./islands/Layout.tsx": $Layout,
     "./islands/Map.tsx": $Map,
-    "./islands/Navbar.tsx": $Navbar,
-    "./islands/Sidebar.tsx": $Sidebar,
   },
   baseUrl: import.meta.url,
 } satisfies Manifest;
