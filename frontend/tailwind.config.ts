@@ -21,6 +21,9 @@ export default {
         nord14: "#A3BE8C",
         nord15: "#B48EAD",
       },
+      fontFamily: {
+        "Inter": ['"Inter Font"', "Helvetica", "Arial", "sans-serif"],
+      },
     },
   },
   content: [
