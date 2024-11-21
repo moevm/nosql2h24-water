@@ -8,8 +8,8 @@ interface User {
   id: string;
   name: string;
   email: string;
-  registration_date: string;
-  profile_update_date: string;
+  created_at: string;
+  updated_at: string;
   avatar_url: string;
 }
 
