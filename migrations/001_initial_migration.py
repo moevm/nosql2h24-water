@@ -16,13 +16,6 @@ def create_constraints_and_indexes(driver):
         REQUIRE u.id IS UNIQUE
         """)
 
-        # Optional index on User email
-        session.run("""
-        CREATE INDEX user_email_index IF NOT EXISTS
-        FOR (u:User)
-        ON (u.email)
-        """)
-
         # Point id uniqueness constraint
         session.run("""
         CREATE CONSTRAINT point_id_unique IF NOT EXISTS
