@@ -55,8 +55,8 @@ class User(BaseModel):
     id: UUID4
     name: str
     email: EmailStr
-    registration_date: datetime
-    profile_update_date: datetime
+    created_at: datetime
+    updated_at: datetime
     avatar_url: str
 
 
@@ -73,9 +73,9 @@ def create_user(user_request: NewUserRequest) -> str:
         id=uuid.uuid4(),
         name=user_request.name,
         email=user_request.email,
-        registration_date=timestamp,
-        profile_update_date=timestamp,
-        avatar_url="",
+        created_at=timestamp,
+        updated_at=timestamp,
+        avatar_url="",  # TODO: Handle user icons
     )
 
     query = """
@@ -83,20 +83,21 @@ def create_user(user_request: NewUserRequest) -> str:
            id: $id,
            name: $name,
            email: $email,
-           registration_date: datetime($registration_date),
-           profile_update_date: datetime($profile_update_date),
+           created_at: datetime($created_at),
+           updated_at: datetime($updated_at),
            avatar_url: $avatar_url
        })
        RETURN u
        """
 
     user_prepared = user.dict()
-    user_prepared["id"] = user_prepared.id.hex
+    user_prepared["id"] = user.id.hex
 
+    result = None
     with driver.session() as session:
         result = session.run(query, user_prepared).single()
 
-    if not result:
+    if result is None:
         raise HTTPException(status_code=500, detail="Failed to create user")
 
     return result['u']['id']
@@ -109,21 +110,22 @@ def get_user(user_id: UUID4) -> User:
     RETURN u
     """
 
+    result = None
     with driver.session() as session:
-        data = session \
+        result = session \
                 .run(query, {"user_id": user_id.hex}) \
-                .single()['u']
+                .single()
 
-    if not data:
+    if result is None:
         raise HTTPException(404, "User not found")
 
     return User(
-        id=UUID4(data[id]),
-        name=data['name'],
-        email=data['email'],
-        registration_date=data['registration_date'].to_native(),
-        profile_update_date=data['profile_update_date'].to_native(),
-        avatar_url=data['avatar_url'],
+        id=UUID4(result[id]),
+        name=result['name'],
+        email=result['email'],
+        created_at=result['created_at'].to_native(),
+        updated_at=result['updated_at'].to_native(),
+        avatar_url=result['avatar_url'],
     )
 
 
@@ -143,8 +145,8 @@ def list_users() -> List[User]:
                 id=UUID4(data['id']),
                 name=data['name'],
                 email=data['email'],
-                registration_date=data['registration_date'].to_native(),
-                profile_update_date=data['profile_update_date'].to_native(),
+                created_at=data['created_at'].to_native(),
+                updated_at=data['updated_at'].to_native(),
                 avatar_url=data['avatar_url'],
             )
 
