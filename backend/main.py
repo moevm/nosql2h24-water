@@ -351,9 +351,6 @@ def list_routes() -> List[Route]:
                     popularity_score=float(route['popularity_score']),
                 ))
 
-    if len(routes) == 0:
-        raise HTTPException(status_code=404, detail="No routes found")
-
     return routes
 
 
