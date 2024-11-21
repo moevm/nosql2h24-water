@@ -30,21 +30,6 @@ class Lake(BaseModel):
     salinity: float
 
 
-class SupportRequestReview(BaseModel):
-    text: str
-    date: str
-    photo: str
-
-
-class SupportRequest(BaseModel):
-    id: str
-    author: str
-    route_reference: Optional[str] = None
-    lake_reference: Optional[str] = None
-    subject: str
-    reviews: List[SupportRequestReview]
-
-
 # Helper function to execute Neo4j queries
 def run_query(cypher_query, parameters=None):
     with driver.session() as session:
@@ -396,26 +381,47 @@ def list_lakes():
     return lakes
 
 
-@app.get("/support-requests/{request_id}", response_model=SupportRequest)
-def get_support_request(request_id: str):
+class SupportTicket(BaseModel):
+    id: UUID4
+    author_id: UUID4
+    subject: str
+    text: str
+    created_at: datetime
+    route_reference: Optional[UUID4] = None
+    lake_reference: Optional[UUID4] = None
+
+
+class CreateSupportTicketRequest(BaseModel):
+    id: UUID4
+    author_id: UUID4
+    subject: str
+    text: str
+    created_at: datetime
+    route_reference: Optional[UUID4] = None
+    lake_reference: Optional[UUID4] = None
+
+
+@app.post("/support-tickets/new", response_model=UUID4)
+def create_support_request(req: CreateSupportTicketRequest) -> UUID4:
+    pass
+
+
+@app.get("/support-tickets/{ticket_id}", response_model=SupportTicket)
+def get_support_request(ticket_id: UUID4) -> SupportTicket:
     query = """
     MATCH (s:SupportRequest {id: $request_id})
     OPTIONAL MATCH (s)-[:HAS_REVIEW]->(r:Review)
     RETURN s, collect(r) as reviews
     """
-    result = run_query(query, {"request_id": request_id})
+    result = run_query(query, {"request_id": ticket_id})
     if result:
         support_request = result[0]['s']
-        reviews = result[0]['reviews'] or []
-        support_request['reviews'] = [
-            SupportRequestReview(**rev) for rev in reviews
-        ]
-        return SupportRequest(**support_request)
+        return SupportTicket(**support_request)
     return {}
 
 
-@app.get("/support-requests", response_model=List[SupportRequest])
-def list_support_requests():
+@app.get("/support-tickets", response_model=List[SupportTicket])
+def list_support_requests() -> SupportTicket:
     query = """
     MATCH (s:SupportRequest)
     OPTIONAL MATCH (s)-[:HAS_REVIEW]->(r:Review)
@@ -426,11 +432,7 @@ def list_support_requests():
     support_requests = []
     for record in result:
         support_request = record['s']
-        reviews = record['reviews'] or []
-        support_request['reviews'] = [
-            SupportRequestReview(**rev) for rev in reviews
-        ]
-        support_requests.append(SupportRequest(**support_request))
+        support_requests.append(SupportTicket(**support_request))
     return support_requests
 
 
@@ -456,46 +458,6 @@ def create_lake(lake: Lake):
         return Lake(**lake_data)
     else:
         raise HTTPException(status_code=500, detail="Failed to create lake")
-
-
-@app.post("/support-requests/new", response_model=SupportRequest)
-def create_support_request(request: SupportRequest):
-    query = """
-       CREATE (s:SupportRequest {
-           id: $id,
-           subject: $subject
-       })
-       WITH s
-       MATCH (u:User {id: $author})
-       CREATE (s)-[:CREATED_BY]->(u)
-       FOREACH (route_id IN CASE WHEN $route_reference IS NULL THEN [] ELSE [$route_reference] END |
-           MATCH (r:Route {id: route_id})
-           CREATE (s)-[:RELATED_TO_ROUTE]->(r)
-       )
-       FOREACH (lake_id IN CASE WHEN $lake_reference IS NULL THEN [] ELSE [$lake_reference] END |
-           MATCH (l:Lake {id: lake_id})
-           CREATE (s)-[:RELATED_TO_LAKE]->(l)
-       )
-       WITH s
-       UNWIND $reviews AS review
-       CREATE (rev:Review {
-           text: review.text,
-           date: review.date,
-           photo: review.photo
-       })
-       CREATE (s)-[:HAS_REVIEW]->(rev)
-       RETURN s
-       """
-    parameters = request.dict()
-    parameters['reviews'] = [review.dict() for review in request.reviews]
-    result = run_query(query, parameters)
-    if result:
-        support_request_data = result[0]['s']
-        support_request_data['reviews'] = request.reviews
-        return SupportRequest(**support_request_data)
-    else:
-        raise HTTPException(status_code=500,
-                            detail="Failed to create support request")
 
 
 if __name__ == "__main__":
