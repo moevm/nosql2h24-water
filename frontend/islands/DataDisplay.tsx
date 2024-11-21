@@ -71,6 +71,8 @@ type FormData = {
   salinity?: number;
   subject?: string;
   coordinates?: GeoJsonPoint;
+  popularity_score?: number;
+  point_ids?: string[];
 };
 
 function DataDisplay() {
@@ -293,7 +295,8 @@ function renderUsersInput(
       <div class="mb-2">
         <label class="block text-nord0 mb-1">Имя пользователя</label>
         <input
-          type="email"
+          type="text"
+          placeholder="example_user"
           class="w-full text-nord0 border border-nord4 rounded px-2 py-1"
           value={formData.name || ""}
           onChange={(e) =>
@@ -307,6 +310,7 @@ function renderUsersInput(
         <label class="block text-nord0 mb-1">Email</label>
         <input
           type="email"
+          placeholder="example@test.tt"
           class="w-full text-nord0 border border-nord4 rounded px-2 py-1"
           value={formData.email || ""}
           onChange={(e) =>
@@ -407,7 +411,71 @@ function renderRoutesInput(
   formData: FormData,
   setFormData: Dispatch<StateUpdater<FormData>>,
 ) {
-  return <div></div>;
+  return (
+    <div class="mb-4 space-y-2">
+      <div class="mb-2">
+        <label class="block text-nord0 mb-1">ID автора маршрута</label>
+        <input
+          type="text"
+          placeholder="52301557-9fb9-4be0-b71e-8c73c1f20abf"
+          class="w-full text-nord0 border border-nord4 rounded px-2 py-1"
+          value={formData.author || ""}
+          onChange={(e) =>
+            setFormData({
+              ...formData,
+              author: (e.target as HTMLInputElement).value,
+            })}
+        />
+      </div>
+      <div>
+        <label class="block text-nord0 mb-1">Индекс популярности</label>
+        <input
+          type="number"
+          placeholder="1.0"
+          step="0.1"
+          class="w-full text-nord0 border border-nord4 rounded px-2 py-1"
+          value={formData.popularity_score || ""}
+          onChange={(e) =>
+            setFormData({
+              ...formData,
+              popularity_score: Number((e.target as HTMLInputElement).value),
+            })}
+        />
+      </div>
+      {/* TODO: Support more than two points in route */}
+      <label class="block mb-1">ID точек</label>
+      <input
+        type="text"
+        placeholder="eecdd55d-4953-45b8-b54c-381fe9e6abd6"
+        class="w-full text-nord0 border border-nord4 rounded px-2 py-1"
+        value={formData.point_ids?.at(0) || ""}
+        onChange={(e) => {
+          setFormData({
+            ...formData,
+            point_ids: [
+              (e.target as HTMLInputElement).value,
+              formData.point_ids?.at(1) || "",
+            ],
+          });
+        }}
+      />
+      <input
+        type="text"
+        placeholder="87cdceae-3cdd-410b-a76e-726b25ef53d4"
+        class="w-full text-nord0 border border-nord4 rounded px-2 py-1"
+        value={formData.point_ids?.at(1) || ""}
+        onChange={(e) => {
+          setFormData({
+            ...formData,
+            point_ids: [
+              formData.point_ids?.at(0) || "",
+              (e.target as HTMLInputElement).value,
+            ],
+          });
+        }}
+      />
+    </div>
+  );
 }
 
 function renderLakesInput(

@@ -74,9 +74,8 @@ export default function Layout({ brand, sidebarState, children }: LayoutProps) {
               />
             </svg>
           </button>
-          {isDesktop && <div class={"font-bold"}>{brand}</div>}
+          {isDesktop && <div class={"container font-bold"}>{brand}</div>}
         </div>
-        {!isDesktop && <div class={"font-bold"}>{brand}</div>}
         {isDesktop && (
           <div class={"flex items-center space-x-4 p-4"}>
             {navbarContent}
@@ -89,7 +88,7 @@ export default function Layout({ brand, sidebarState, children }: LayoutProps) {
             sidebarOpen ? "flex-shrink-0 w-auto min-w-max" : "w-0"
           } overflow-hidden`}
         >
-          <div class={"p-4"}>
+          <div>
             {sidebarContent}
           </div>
         </aside>
