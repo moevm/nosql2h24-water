@@ -82,42 +82,42 @@ function DataDisplay() {
   const [addEntryShown, setAddEntryShown] = useState<boolean>(false);
 
   useEffect(() => {
-    fetchData().catch(console.error);
-  }, [category]);
+    const controller = new AbortController();
+    const signal = controller.signal;
 
-  const fetchData = async () => {
     setData([]);
 
-    const response = await fetch(`http://localhost:8000/${category}`);
-    if (!response.ok) {
-      console.error("Failed to fetch data");
-      return;
-    }
+    fetch(`http://localhost:8000/${category}`, { signal })
+      .then((data) => data.json())
+      .then((data) => setData(data))
+      .catch((e) => console.error(e));
 
-    const jsonData = await response.json();
-    setData(jsonData);
-  };
+    return () => {
+      controller.abort("Cancelled");
+    };
+  }, [category]);
 
-  const handleAddEntry = async () => {
-    const response = await fetch(`http://localhost:8000/${category}/new`, {
+  const handleAddEntry = () => {
+    fetch(`http://localhost:8000/${category}/new`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify(formData),
-    });
-    if (!response.ok) {
-      console.error("Failed to add data");
-      return;
-    }
-    // Clear form and refresh data
-    setFormData({});
-    fetchData();
+    })
+      .then((data) => console.log(`Returned data: ${data}`))
+      .then(() => setFormData({}))
+      .then(() =>
+        fetch(`http://localhost:8000/${category}`)
+          .then((data) => data.json())
+          .then((data) => setData(data))
+      )
+      .catch((e) => console.error(e));
   };
 
   const addEntryForm = () => {
     return (
-      <div>
+      <>
         {renderInputs(category, formData, setFormData)}
 
         <button
@@ -126,7 +126,7 @@ function DataDisplay() {
         >
           Добавить
         </button>
-      </div>
+      </>
     );
   };
 
@@ -141,7 +141,6 @@ function DataDisplay() {
               (e.target as HTMLSelectElement).value as DataCategory,
             );
             setFormData({});
-            fetchData();
           }}
         >
           <option value="users">Пользователи</option>
