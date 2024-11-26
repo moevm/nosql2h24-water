@@ -7,6 +7,7 @@ import * as $_app from "./routes/_app.tsx";
 import * as $admin from "./routes/admin.tsx";
 import * as $index from "./routes/index.tsx";
 import * as $DataDisplay from "./islands/DataDisplay.tsx";
+import * as $DataTable from "./islands/DataTable.tsx";
 import * as $Layout from "./islands/Layout.tsx";
 import * as $Map from "./islands/Map.tsx";
 import type { Manifest } from "$fresh/server.ts";
@@ -20,6 +21,7 @@ const manifest = {
   },
   islands: {
     "./islands/DataDisplay.tsx": $DataDisplay,
+    "./islands/DataTable.tsx": $DataTable,
     "./islands/Layout.tsx": $Layout,
     "./islands/Map.tsx": $Map,
   },

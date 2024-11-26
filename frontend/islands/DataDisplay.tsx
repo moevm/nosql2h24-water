@@ -3,6 +3,7 @@ import {
   Point as GeoJsonPoint,
   Polygon as GeoJsonPolygon,
 } from "npm:@types/geojson";
+import DataTable from "./DataTable.tsx";
 
 interface User {
   id: string;
@@ -50,10 +51,9 @@ interface SupportRequest {
   photo: string;
 }
 
-type DataItem = User | Point | Route | Lake | SupportRequest;
-type DataCell = string | number | string[] | GeoJsonPoint | GeoJsonPolygon;
+export type DataItem = User | Point | Route | Lake | SupportRequest;
 
-type DataCategory =
+export type DataCategory =
   | "users"
   | "points"
   | "routes"
@@ -73,62 +73,33 @@ type FormData = {
   coordinates?: GeoJsonPoint;
   popularity_score?: number;
   point_ids?: string[];
+  inflowing_rivers?: string[];
+  outflowing_rivers?: string[];
+  coordinates_boundary?: GeoJsonPolygon;
 };
+
+function handleAddEntry(
+  category: DataCategory,
+  formData: FormData,
+  setCategory: Dispatch<StateUpdater<DataCategory>>,
+  setFormData: Dispatch<StateUpdater<FormData>>,
+) {
+  fetch(`http://localhost:8000/${category}/new`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(formData),
+  })
+    .then(() => setFormData({}))
+    .then(() => setCategory(category + ""))
+    .catch((e) => console.error(e));
+}
 
 function DataDisplay() {
   const [category, setCategory] = useState<DataCategory>("users");
-  const [data, setData] = useState<DataItem[]>([]);
   const [formData, setFormData] = useState<FormData>({});
   const [addEntryShown, setAddEntryShown] = useState<boolean>(false);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    const signal = controller.signal;
-
-    setData([]);
-
-    fetch(`http://localhost:8000/${category}`, { signal })
-      .then((data) => data.json())
-      .then((data) => setData(data))
-      .catch((e) => console.error(e));
-
-    return () => {
-      controller.abort("Cancelled");
-    };
-  }, [category]);
-
-  const handleAddEntry = () => {
-    fetch(`http://localhost:8000/${category}/new`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(formData),
-    })
-      .then((data) => console.log(`Returned data: ${data}`))
-      .then(() => setFormData({}))
-      .then(() =>
-        fetch(`http://localhost:8000/${category}`)
-          .then((data) => data.json())
-          .then((data) => setData(data))
-      )
-      .catch((e) => console.error(e));
-  };
-
-  const addEntryForm = () => {
-    return (
-      <>
-        {renderInputs(category, formData, setFormData)}
-
-        <button
-          onClick={handleAddEntry}
-          class="bg-nord8 text-nord0 px-3 py-1 rounded focus:outline-none focus:ring-2 focus:ring-nord8 mb-6"
-        >
-          Добавить
-        </button>
-      </>
-    );
-  };
 
   return (
     <div class="p-4">
@@ -180,88 +151,33 @@ function DataDisplay() {
         </button>
       </div>
 
-      {addEntryShown && addEntryForm()}
+      {addEntryShown &&
+        addEntryForm(category, formData, setCategory, setFormData)}
 
-      <div class="overflow-auto rounded-lg shadow">
-        <table class="min-w-full table-auto bg-nord5 text-nord0">
-          <thead class="bg-nord7">{renderTableHeaders(data)}</thead>
-          <tbody class="bg-nord4">{renderTableRows(data)}</tbody>
-        </table>
-      </div>
+      <DataTable category={category} />
     </div>
   );
 }
 
-function renderTableHeaders(data: DataItem[]) {
-  if (data.length === 0) return null;
+function addEntryForm(
+  category: DataCategory,
+  formData: FormData,
+  setCategory: Dispatch<StateUpdater<DataCategory>>,
+  setFormData: Dispatch<StateUpdater<FormData>>,
+) {
   return (
-    <tr>
-      {Object.keys(data[0]).map((key) => (
-        <th
-          key={key}
-          class="px-4 py-2 border-b-2 border-nord4 text-left uppercase tracking-wider"
-        >
-          {key.replace(/_/g, " ")}
-        </th>
-      ))}
-    </tr>
+    <>
+      {renderInputs(category, formData, setFormData)}
+
+      <button
+        onClick={() =>
+          handleAddEntry(category, formData, setCategory, setFormData)}
+        class="bg-nord8 text-nord0 px-3 py-1 rounded focus:outline-none focus:ring-2 focus:ring-nord8 mb-6"
+      >
+        Добавить
+      </button>
+    </>
   );
-}
-
-function renderTableRows(data: DataItem[]) {
-  if (data.length === 0) {
-    return (
-      <tr>
-        <td
-          class="px-4 py-2 text-center"
-          colSpan={Object.keys(data[0] || {}).length || 1}
-        >
-          Нет данных
-        </td>
-      </tr>
-    );
-  }
-
-  return data.map((item: DataItem, index: number) => (
-    <tr
-      key={index}
-      class={`${
-        index % 2 === 0 ? "bg-nord4" : "bg-nord5"
-      } hover:bg-nord6 hover:rounded`}
-    >
-      {Object.values(item).map((value, i) => (
-        <td key={i} class="px-4 py-2 border-b border-nord4">
-          {renderCellValue(value)}
-        </td>
-      ))}
-    </tr>
-  ));
-}
-
-function renderCellValue(value: DataCell) {
-  const formatCoordinates = (num: number) => {
-    const formatted = num.toFixed(6);
-    const parts = formatted.split(".");
-    parts[0] = parts[0].padStart(2, "0");
-    return parts.join(".");
-  };
-
-  if (value === null || value === undefined) {
-    return "";
-  } else if (typeof value === "string" || typeof value === "number") {
-    return value;
-  } else if (Array.isArray(value)) {
-    return value.join(", ");
-  } else if (value?.type === "Point") {
-    return [
-      formatCoordinates(value.coordinates[0]),
-      formatCoordinates(value.coordinates[1]),
-    ].join(" ");
-  } else if (typeof value === "object") {
-    return JSON.stringify(value);
-  } else {
-    return String(value);
-  }
 }
 
 function renderInputs(
@@ -484,9 +400,10 @@ function renderLakesInput(
   return (
     <div class="mb-4">
       <div class="mb-2">
-        <label class="block text-nord0 mb-1">Имя</label>
+        <label class="block text-nord0 mb-1">Название озера</label>
         <input
           type="text"
+          placeholder="Озеро на Невском"
           class="w-full text-nord0 border border-nord4 rounded px-2 py-1"
           value={formData.name || ""}
           onChange={(e) =>
@@ -500,6 +417,7 @@ function renderLakesInput(
         <label class="block text-nord0 mb-1">Описание</label>
         <textarea
           class="w-full text-nord0 border border-nord4 rounded px-2 py-1"
+          placeholder="Описание озера на Невском"
           value={formData.description || ""}
           onChange={(e) =>
             setFormData({
@@ -512,7 +430,7 @@ function renderLakesInput(
         <label class="block text-nord0 mb-1">Глубина</label>
         <input
           type="number"
-          step="any"
+          step="0.1"
           class="w-full text-nord0 border border-nord4 rounded px-2 py-1"
           value={formData.max_depth !== undefined ? formData.max_depth : ""}
           onChange={(e) =>
@@ -526,7 +444,7 @@ function renderLakesInput(
         <label class="block text-nord0 mb-1">Содержание соли</label>
         <input
           type="number"
-          step="any"
+          step="0.1"
           class="w-full text-nord0 border border-nord4 rounded px-2 py-1"
           value={formData.salinity !== undefined ? formData.salinity : ""}
           onChange={(e) =>
@@ -534,6 +452,141 @@ function renderLakesInput(
               ...formData,
               salinity: Number((e.target as HTMLInputElement).value),
             })}
+        />
+      </div>
+      <div>
+        <label class="block text-nord0 mb-1">Индекс доступности</label>
+        <input
+          type="number"
+          step="0.1"
+          class="w-full text-nord0 border border-nord4 rounded px-2 py-1"
+          value={formData.availability !== undefined
+            ? formData.availability
+            : ""}
+          onChange={(e) =>
+            setFormData({
+              ...formData,
+              availability: Number((e.target as HTMLInputElement).value),
+            })}
+        />
+      </div>
+      <label class="block mb-1">Впадающие реки</label>
+      <input
+        type="text"
+        placeholder="Нева"
+        class="w-full text-nord0 border border-nord4 rounded px-2 py-1"
+        value={formData.inflowing_rivers?.at(0) || ""}
+        onChange={(e) => {
+          setFormData({
+            ...formData,
+            inflowing_rivers: [
+              (e.target as HTMLInputElement).value,
+            ],
+          });
+        }}
+      />
+      <label class="block mb-1">Вытекающие реки</label>
+      <input
+        type="text"
+        placeholder="Волга"
+        class="w-full text-nord0 border border-nord4 rounded px-2 py-1"
+        value={formData.outflowing_rivers?.at(1) || ""}
+        onChange={(e) => {
+          setFormData({
+            ...formData,
+            outflowing_rivers: [
+              (e.target as HTMLInputElement).value,
+            ],
+          });
+        }}
+      />
+      <label class="block mb-1">Координаты точек-границ озера</label>
+      <div class="mb-2 flex items-center space-x-2">
+        <input
+          class="w-full text-nord0 border border-nord4 rounded px-2 py-1"
+          type="number"
+          step="0.000001"
+          placeholder="00.000000"
+          value={formData.coordinates_boundary?.coordinates.at(0)?.at(0)?.at(0)}
+          onChange={(e) => {
+            setFormData({
+              ...formData,
+              coordinates: {
+                type: "Point",
+                coordinates: [
+                  Number(
+                    (e.target as HTMLInputElement).value,
+                  ),
+                  formData.coordinates?.coordinates.at(1) || 0.0,
+                ],
+              },
+            });
+          }}
+        />
+        <input
+          class="w-full text-nord0 border border-nord4 rounded px-2 py-1"
+          type="number"
+          step="0.000001"
+          placeholder="00.000000"
+          value={formData.coordinates?.coordinates.at(1) || ""}
+          onChange={(e) => {
+            setFormData({
+              ...formData,
+              coordinates: {
+                type: "Point",
+                coordinates: [
+                  formData.coordinates?.coordinates.at(0) || 0.0,
+                  Number(
+                    (e.target as HTMLInputElement).value,
+                  ),
+                ],
+              },
+            });
+          }}
+        />
+      </div>
+      <div class="mb-2 flex items-center space-x-2">
+        <input
+          class="w-full text-nord0 border border-nord4 rounded px-2 py-1"
+          type="number"
+          step="0.000001"
+          placeholder="00.000000"
+          value={formData.coordinates?.coordinates.at(0) || ""}
+          onChange={(e) => {
+            setFormData({
+              ...formData,
+              coordinates: {
+                type: "Point",
+                coordinates: [
+                  Number(
+                    (e.target as HTMLInputElement).value,
+                  ),
+                  formData.coordinates?.coordinates.at(1) || 0.0,
+                ],
+              },
+            });
+          }}
+        />
+        <input
+          class="w-full text-nord0 border border-nord4 rounded px-2 py-1"
+          type="number"
+          step="0.000001"
+          placeholder="00.000000"
+          value={formData.coordinates?.coordinates.at(1) || ""}
+          onChange={(e) => {
+            setFormData({
+              ...formData,
+              coordinates: {
+                type: "Point",
+                coordinates: [
+                  formData.coordinates?.coordinates.at(0) || 0.0,
+                  Number(
+                    (e.target as HTMLInputElement).value,
+                  ),
+                ],
+              },
+            });
+          }}
         />
       </div>
     </div>
