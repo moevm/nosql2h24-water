@@ -485,48 +485,116 @@ class SupportTicket(BaseModel):
 
 
 class CreateSupportTicketRequest(BaseModel):
-    id: UUID4
     author_id: UUID4
     subject: str
     text: str
-    created_at: datetime
     route_reference: Optional[UUID4] = None
     lake_reference: Optional[UUID4] = None
 
 
 @app.post("/support-tickets/new", response_model=UUID4)
-def create_support_request(req: CreateSupportTicketRequest) -> UUID4:
-    pass
+def create_support_ticket(req: CreateSupportTicketRequest) -> UUID4:
+    query = """
+MATCH (author:User {id: $author_id})
+CREATE (ticket:SupportTicket {
+    id: randomUUID(),
+    subject: $subject,
+    text: $text,
+    created_at: datetime($created_at)
+})
+CREATE (ticket)-[:CREATED_BY]->(author)
+WITH ticket
+OPTIONAL MATCH (route:Route {id: $route_reference})
+FOREACH (_ IN CASE WHEN route IS NULL THEN [] ELSE [1] END |
+    CREATE (ticket)-[:REFERENCED_BY]->(route))
+WITH ticket
+OPTIONAL MATCH (lake:Lake {id: $lake_reference})
+FOREACH (_ IN CASE WHEN lake IS NULL THEN [] ELSE [1] END |
+    CREATE (ticket)-[:REFERENCED_BY]->(lake))
+RETURN ticket AS t
+    """
+
+    ticket_prepared = req.dict()
+    ticket_prepared['author_id'] = req.author_id.hex
+    ticket_prepared['created_at'] = datetime.now(timezone.utc)
+
+    data = None
+    with driver.session() as session:
+        data = session.run(query, ticket_prepared).single()
+
+    if data is None:
+        raise HTTPException(status_code=500, detail="Failed to create ticket")
+
+    return data['t']['id']
 
 
 @app.get("/support-tickets/{ticket_id}", response_model=SupportTicket)
-def get_support_request(ticket_id: UUID4) -> SupportTicket:
+def get_support_ticket(ticket_id: UUID4) -> SupportTicket:
     query = """
-    MATCH (s:SupportRequest {id: $request_id})
-    OPTIONAL MATCH (s)-[:HAS_REVIEW]->(r:Review)
-    RETURN s, collect(r) as reviews
+MATCH (ticket:SupportTicket {id: $ticket_id})
+OPTIONAL MATCH (ticket)-[:CREATED_BY]->(author:User)
+OPTIONAL MATCH (ticket)-[:REFERENCED_BY]->(route:Route)
+OPTIONAL MATCH (ticket)-[:REFERENCED_BY]->(lake:Lake)
+RETURN
+  ticket.id AS id,
+  author.id AS author_id,
+  ticket.subject AS subject,
+  ticket.text AS text,
+  ticket.created_at AS created_at,
+  route.id AS route_reference,
+  lake.id AS lake_reference
     """
-    result = run_query(query, {"request_id": ticket_id})
-    if result:
-        support_request = result[0]['s']
-        return SupportTicket(**support_request)
-    return {}
+
+    data = None
+    with driver.session() as session:
+        data = session.run(query, {"ticket_id": ticket_id.hex}).single()
+
+    if data is None:
+        raise HTTPException(status_code=404, detail="Failed to find ticket")
+
+    return SupportTicket(
+        id=UUID4(data['id']),
+        author_id=data['author_id'],
+        subject=data['subject'],
+        text=data['text'],
+        created_at=data['created_at'].to_native(),
+        route_reference=data.get('route_reference'),
+        lake_reference=data.get('lake_reference'),
+    )
 
 
 @app.get("/support-tickets", response_model=List[SupportTicket])
-def list_support_requests() -> SupportTicket:
+def list_support_tickets() -> SupportTicket:
     query = """
-    MATCH (s:SupportRequest)
-    OPTIONAL MATCH (s)-[:HAS_REVIEW]->(r:Review)
-    WITH s, collect(r) as reviews
-    RETURN s, reviews
+MATCH (ticket:SupportTicket)
+OPTIONAL MATCH (ticket)-[:CREATED_BY]->(author:User)
+OPTIONAL MATCH (ticket)-[:REFERENCED_BY]->(route:Route)
+OPTIONAL MATCH (ticket)-[:REFERENCED_BY]->(lake:Lake)
+RETURN
+  ticket.id AS id,
+  author.id AS author_id,
+  ticket.subject AS subject,
+  ticket.text AS text,
+  ticket.created_at AS created_at,
+  route.id AS route_reference,
+  lake.id AS lake_reference
     """
-    result = run_query(query)
-    support_requests = []
-    for record in result:
-        support_request = record['s']
-        support_requests.append(SupportTicket(**support_request))
-    return support_requests
+
+    tickets = []
+    with driver.session() as session:
+        for record in session.run(query):
+            tickets.append(
+                SupportTicket(
+                    id=UUID4(record['id']),
+                    author_id=record['author_id'],
+                    subject=record['subject'],
+                    text=record['text'],
+                    created_at=record['created_at'].to_native(),
+                    route_reference=record.get('route_reference'),
+                    lake_reference=record.get('lake_reference'),
+                ))
+
+    return tickets
 
 
 if __name__ == "__main__":
