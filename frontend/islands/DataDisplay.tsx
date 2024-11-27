@@ -40,25 +40,24 @@ interface Lake {
   salinity: number;
 }
 
-interface SupportRequest {
+interface SupportTicket {
   id: string;
-  author: string;
+  author_id: string;
   route_reference?: string;
   lake_reference?: string;
   subject: string;
   text: string;
-  date: string;
-  photo: string;
+  created_at: string;
 }
 
-export type DataItem = User | Point | Route | Lake | SupportRequest;
+export type DataItem = User | Point | Route | Lake | SupportTicket;
 
 export type DataCategory =
   | "users"
   | "points"
   | "routes"
   | "lakes"
-  | "support-requests";
+  | "support-tickets";
 
 type FormData = {
   email?: string;
@@ -76,6 +75,10 @@ type FormData = {
   inflowing_rivers?: string[];
   outflowing_rivers?: string[];
   coordinates_boundary?: GeoJsonPolygon;
+  route_reference?: string;
+  lake_reference?: string;
+  author_id?: string;
+  text?: string;
 };
 
 function handleAddEntry(
@@ -118,7 +121,7 @@ function DataDisplay() {
           <option value="points">Точки</option>
           <option value="routes">Маршруты</option>
           <option value="lakes">Озера</option>
-          <option value="support-requests">Обращения в поддержку</option>
+          <option value="support-tickets">Обращения в поддержку</option>
         </select>
         <button
           class="flex items-center justify-center w-10 h-10 text-nord0 rounded hover:bg-nord5"
@@ -194,7 +197,7 @@ function renderInputs(
       return renderRoutesInput(formData, setFormData);
     case "lakes":
       return renderLakesInput(formData, setFormData);
-    case "support-requests":
+    case "support-tickets":
       return renderSupportRequestsInput(formData, setFormData);
     default:
       return null;
@@ -581,20 +584,22 @@ function renderSupportRequestsInput(
   return (
     <div class="mb-4">
       <div class="mb-2">
-        <label class="block text-nord0 mb-1">Автор</label>
+        <label class="block text-nord0 mb-1">ID автора</label>
         <input
           type="text"
+          placeholder="9f179371-23b9-416c-b48e-4601610b5213"
           class="w-full text-nord0 border border-nord4 rounded px-2 py-1"
-          value={formData.author || ""}
-          onChange={(e) =>
+          value={formData.author_id || ""}
+          onChange={(e) => {
             setFormData({
               ...formData,
-              author: (e.target as HTMLInputElement).value,
-            })}
+              author_id: (e.target as HTMLInputElement).value,
+            });
+          }}
         />
       </div>
       <div>
-        <label class="block text-nord0 mb-1">Содержание</label>
+        <label class="block text-nord0 mb-1">Тема запроса</label>
         <input
           type="text"
           class="w-full text-nord0 border border-nord4 rounded px-2 py-1"
@@ -604,6 +609,49 @@ function renderSupportRequestsInput(
               ...formData,
               subject: (e.target as HTMLInputElement).value,
             })}
+        />
+      </div>
+      <div class="mb-2">
+        <label class="block text-nord0 mb-1">Описание проблемы</label>
+        <textarea
+          class="w-full text-nord0 border border-nord4 rounded px-2 py-1"
+          placeholder="Описание озера на Невском"
+          value={formData.text || ""}
+          onChange={(e) =>
+            setFormData({
+              ...formData,
+              text: (e.target as HTMLTextAreaElement).value,
+            })}
+        />
+      </div>
+      <div class="mb-2">
+        <label class="block text-nord0 mb-1">ID Маршрута</label>
+        <input
+          type="text"
+          placeholder="9f179371-23b9-416c-b48e-4601610b5213"
+          class="w-full text-nord0 border border-nord4 rounded px-2 py-1"
+          value={formData.route_reference || ""}
+          onChange={(e) => {
+            setFormData({
+              ...formData,
+              route_reference: (e.target as HTMLInputElement).value,
+            });
+          }}
+        />
+      </div>
+      <div class="mb-2">
+        <label class="block text-nord0 mb-1">ID Озера</label>
+        <input
+          type="text"
+          placeholder="9f179371-23b9-416c-b48e-4601610b5213"
+          class="w-full text-nord0 border border-nord4 rounded px-2 py-1"
+          value={formData.lake_reference || ""}
+          onChange={(e) => {
+            setFormData({
+              ...formData,
+              lake_reference: (e.target as HTMLInputElement).value,
+            });
+          }}
         />
       </div>
     </div>
