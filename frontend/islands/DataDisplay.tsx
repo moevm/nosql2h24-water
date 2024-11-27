@@ -1,4 +1,4 @@
-import { Dispatch, StateUpdater, useEffect, useState } from "preact/hooks";
+import { Dispatch, StateUpdater, useState } from "preact/hooks";
 import {
   Point as GeoJsonPoint,
   Polygon as GeoJsonPolygon,
@@ -397,6 +397,23 @@ function renderLakesInput(
   formData: FormData,
   setFormData: Dispatch<StateUpdater<FormData>>,
 ) {
+  const [coordinates, setCoordinates] = useState<[number, number][]>([]);
+
+  const addPoint = () => {
+    setCoordinates([...coordinates, [0, 0]]);
+  };
+
+  const updatePoint = (index: number, coord: [number, number]) => {
+    const newCoordinates = [...coordinates];
+    newCoordinates[index] = coord;
+    setCoordinates(newCoordinates);
+
+    formData.coordinates_boundary = {
+      type: "Polygon",
+      // GeoJSON Polygons have an array of Linear Rings. Each Linear Ring is an array of positions.
+      coordinates: [newCoordinates],
+    };
+  };
   return (
     <div class="mb-4">
       <div class="mb-2">
@@ -431,6 +448,7 @@ function renderLakesInput(
         <input
           type="number"
           step="0.1"
+          placeholder="50.0"
           class="w-full text-nord0 border border-nord4 rounded px-2 py-1"
           value={formData.max_depth !== undefined ? formData.max_depth : ""}
           onChange={(e) =>
@@ -445,6 +463,7 @@ function renderLakesInput(
         <input
           type="number"
           step="0.1"
+          placeholder="1.0"
           class="w-full text-nord0 border border-nord4 rounded px-2 py-1"
           value={formData.salinity !== undefined ? formData.salinity : ""}
           onChange={(e) =>
@@ -459,6 +478,7 @@ function renderLakesInput(
         <input
           type="number"
           step="0.1"
+          placeholder="1.0"
           class="w-full text-nord0 border border-nord4 rounded px-2 py-1"
           value={formData.availability !== undefined
             ? formData.availability
@@ -500,94 +520,55 @@ function renderLakesInput(
           });
         }}
       />
-      <label class="block mb-1">Координаты точек-границ озера</label>
-      <div class="mb-2 flex items-center space-x-2">
-        <input
-          class="w-full text-nord0 border border-nord4 rounded px-2 py-1"
-          type="number"
-          step="0.000001"
-          placeholder="00.000000"
-          value={formData.coordinates_boundary?.coordinates.at(0)?.at(0)?.at(0)}
-          onChange={(e) => {
-            setFormData({
-              ...formData,
-              coordinates: {
-                type: "Point",
-                coordinates: [
-                  Number(
+      <div class="mb-2">
+        <div class="flex items-center space-x-4 md:space-x-2 mb-6 h-10 my-2">
+          <label class="flex items-center mb-1">
+            Координаты точек-границ озера
+            <button
+              class="ml-2 bg-nord8 text-nord0 px-3 py-1 rounded focus:outline-none focus:ring-2 focus:ring-nord8"
+              type="button"
+              onClick={addPoint}
+            >
+              Добавить точку
+            </button>
+          </label>
+        </div>
+        {coordinates.map((coord: [number, number], index: number) => (
+          <div class="flex items-center space-x-4" key={index}>
+            <label class="block">
+              Точка {index + 1} Longitude:
+              <input
+                type="number"
+                value={coord[0]}
+                class="w-full text-nord0 border border-nord4 rounded px-2"
+                placeholder="00.000000"
+                step="0.000001"
+                onInput={(e) => {
+                  const value = parseFloat(
                     (e.target as HTMLInputElement).value,
-                  ),
-                  formData.coordinates?.coordinates.at(1) || 0.0,
-                ],
-              },
-            });
-          }}
-        />
-        <input
-          class="w-full text-nord0 border border-nord4 rounded px-2 py-1"
-          type="number"
-          step="0.000001"
-          placeholder="00.000000"
-          value={formData.coordinates?.coordinates.at(1) || ""}
-          onChange={(e) => {
-            setFormData({
-              ...formData,
-              coordinates: {
-                type: "Point",
-                coordinates: [
-                  formData.coordinates?.coordinates.at(0) || 0.0,
-                  Number(
+                  );
+                  updatePoint(index, [value, coord[1]]);
+                }}
+              />
+            </label>
+            <label class="block">
+              Точка {index + 1} Latitude:
+              <input
+                type="number"
+                value={coord[1]}
+                class="w-full text-nord0 border border-nord4 rounded px-2"
+                placeholder="00.000000"
+                step="0.000001"
+                onInput={(e) => {
+                  const value = parseFloat(
                     (e.target as HTMLInputElement).value,
-                  ),
-                ],
-              },
-            });
-          }}
-        />
-      </div>
-      <div class="mb-2 flex items-center space-x-2">
-        <input
-          class="w-full text-nord0 border border-nord4 rounded px-2 py-1"
-          type="number"
-          step="0.000001"
-          placeholder="00.000000"
-          value={formData.coordinates?.coordinates.at(0) || ""}
-          onChange={(e) => {
-            setFormData({
-              ...formData,
-              coordinates: {
-                type: "Point",
-                coordinates: [
-                  Number(
-                    (e.target as HTMLInputElement).value,
-                  ),
-                  formData.coordinates?.coordinates.at(1) || 0.0,
-                ],
-              },
-            });
-          }}
-        />
-        <input
-          class="w-full text-nord0 border border-nord4 rounded px-2 py-1"
-          type="number"
-          step="0.000001"
-          placeholder="00.000000"
-          value={formData.coordinates?.coordinates.at(1) || ""}
-          onChange={(e) => {
-            setFormData({
-              ...formData,
-              coordinates: {
-                type: "Point",
-                coordinates: [
-                  formData.coordinates?.coordinates.at(0) || 0.0,
-                  Number(
-                    (e.target as HTMLInputElement).value,
-                  ),
-                ],
-              },
-            });
-          }}
-        />
+                  );
+                  updatePoint(index, [coord[0], value]);
+                }}
+              />
+            </label>
+          </div>
+        ))}
       </div>
     </div>
   );

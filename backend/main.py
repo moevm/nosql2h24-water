@@ -18,24 +18,6 @@ NEO4J_PASSWORD = os.getenv('NEO4J_PASSWORD', 'neo4j')
 driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
 
 
-class Lake(BaseModel):
-    id: str
-    name: str
-    description: str
-    coordinates_boundary: dict
-    availability_score: float
-    max_depth: float
-    inflowing_rivers: List[str]
-    outflowing_rivers: List[str]
-    salinity: float
-
-
-# Helper function to execute Neo4j queries
-def run_query(cypher_query, parameters=None):
-    with driver.session() as session:
-        return session.run(cypher_query, parameters)
-
-
 class User(BaseModel):
     id: UUID4
     name: str
@@ -354,27 +336,141 @@ def list_routes() -> List[Route]:
     return routes
 
 
+class Lake(BaseModel):
+    id: UUID4
+    name: str
+    description: str
+    coordinates_boundary: dict
+    availability_score: float
+    max_depth: float
+    salinity: float
+    inflowing_rivers: List[str]
+    outflowing_rivers: List[str]
+
+
+class CreateLakeRequest(BaseModel):
+    name: str
+    description: str
+    coordinates_boundary: dict
+    availability: float
+    max_depth: float
+    salinity: float
+    inflowing_rivers: List[str]
+    outflowing_rivers: List[str]
+
+
+@app.post("/lakes/new", response_model=UUID4)
+def create_lake(req: CreateLakeRequest) -> UUID4:
+    lake = Lake(
+        id=uuid.uuid4(),
+        name=req.name,
+        description=req.description,
+        coordinates_boundary=req.coordinates_boundary,
+        availability_score=req.availability,
+        max_depth=req.max_depth,
+        salinity=req.salinity,
+        inflowing_rivers=req.inflowing_rivers,
+        outflowing_rivers=req.outflowing_rivers,
+    )
+
+    query = """
+CREATE (l:Lake {
+    id: $id,
+    name: $name,
+    description: $description,
+    coordinates_boundary: [c IN $coordinates_boundary | point({
+        longitude: c.lon,
+        latitude: c.lat
+    })],
+    availability_score: $availability_score,
+    max_depth: $max_depth,
+    inflowing_rivers: $inflowing_rivers,
+    outflowing_rivers: $outflowing_rivers,
+    salinity: $salinity
+})
+RETURN l
+       """
+
+    lake_prepared = lake.dict()
+    lake_prepared['id'] = lake.id.hex
+    lake_prepared['coordinates_boundary'] = \
+        [{"lon": point[0], "lat": point[1]}
+            for point in lake.coordinates_boundary['coordinates'][0]]
+
+    result = None
+    with driver.session() as session:
+        result = session.run(query, lake_prepared).single()
+
+    if result is None:
+        raise HTTPException(status_code=500, detail="Failed to create lake")
+
+    return UUID4(result['l']['id'])
+
+
 @app.get("/lakes/{lake_id}", response_model=Lake)
-def get_lake(lake_id: str):
+def get_lake(lake_id: UUID4) -> Lake:
     query = """
     MATCH (l:Lake {id: $lake_id})
     RETURN l
     """
-    result = run_query(query, {"lake_id": lake_id})
-    if result:
-        lake = result[0]['l']
-        return Lake(**lake)
-    return {}
+
+    result = None
+    with driver.session() as session:
+        result = session.run(query, {"lake_id": lake_id.hex}).single()
+
+    if result is None:
+        raise HTTPException(status_code=404, detail="Lake not found")
+
+    lake = result['l']
+    return Lake(
+        id=lake['id'],
+        name=lake['name'],
+        description=lake['description'],
+        coordinates_boundary={
+            "type":
+            "Polygon",
+            "coordinates":
+            [[(point[0], point[1]) for point in lake['coordinates_boundary']]],
+        },
+        availability_score=float(lake['availability_score']),
+        max_depth=float(lake['max_depth']),
+        salinity=float(lake['salinity']),
+        inflowing_rivers=list(lake['inflowing_rivers']),
+        outflowing_rivers=list(lake['outflowing_rivers']),
+    )
 
 
 @app.get("/lakes", response_model=List[Lake])
-def list_lakes():
+def list_lakes() -> List[Lake]:
     query = """
     MATCH (l:Lake)
     RETURN l
     """
-    result = run_query(query)
-    lakes = [Lake(**record['l']) for record in result]
+
+    lakes: List[Lake] = []
+    with driver.session() as session:
+        for record in session.run(query):
+            lake = record['l']
+
+            lakes.append(
+                Lake(
+                    id=lake['id'],
+                    name=lake['name'],
+                    description=lake['description'],
+                    coordinates_boundary={
+                        "type":
+                        "Polygon",
+                        "coordinates":
+                        [(point[0], point[1])
+                         for point in lake['coordinates_boundary']],
+                    },
+                    availability_score=float(lake['availability_score']),
+                    max_depth=float(lake['max_depth']),
+                    salinity=float(lake['salinity']),
+                    inflowing_rivers=list(lake['inflowing_rivers']),
+                    outflowing_rivers=list(lake['outflowing_rivers']),
+                ))
+
     return lakes
 
 
@@ -431,30 +527,6 @@ def list_support_requests() -> SupportTicket:
         support_request = record['s']
         support_requests.append(SupportTicket(**support_request))
     return support_requests
-
-
-@app.post("/lakes/new", response_model=Lake)
-def create_lake(lake: Lake):
-    query = """
-       CREATE (l:Lake {
-           id: $id,
-           name: $name,
-           description: $description,
-           coordinates_boundary: $coordinates_boundary,
-           availability_score: $availability_score,
-           max_depth: $max_depth,
-           inflowing_rivers: $inflowing_rivers,
-           outflowing_rivers: $outflowing_rivers,
-           salinity: $salinity
-       })
-       RETURN l
-       """
-    result = run_query(query, lake.dict())
-    if result:
-        lake_data = result[0]['l']
-        return Lake(**lake_data)
-    else:
-        raise HTTPException(status_code=500, detail="Failed to create lake")
 
 
 if __name__ == "__main__":
