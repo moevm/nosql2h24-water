@@ -1,16 +1,15 @@
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, EmailStr, UUID4
+from pydantic import BaseModel, EmailStr
 from typing import List, Optional
 from neo4j import GraphDatabase
+from uuid import UUID
 
 import uvicorn
 import os
-from datetime import datetime, timezone
-import uuid
+from datetime import datetime
 
 app = FastAPI()
 
-# Neo4j database credentials
 NEO4J_URI = os.getenv('NEO4J_URI', 'bolt://localhost:7687')
 NEO4J_USER = os.getenv('NEO4J_USER', 'neo4j')
 NEO4J_PASSWORD = os.getenv('NEO4J_PASSWORD', 'neo4j')
@@ -19,7 +18,7 @@ driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
 
 
 class User(BaseModel):
-    id: UUID4
+    id: UUID
     name: str
     email: EmailStr
     created_at: datetime
@@ -33,66 +32,50 @@ class NewUserRequest(BaseModel):
 
 
 @app.post("/users/new", response_model=str)
-def create_user(user_request: NewUserRequest) -> str:
-    timestamp = datetime.now(timezone.utc)
-
-    user = User(
-        id=uuid.uuid4(),
-        name=user_request.name,
-        email=user_request.email,
-        created_at=timestamp,
-        updated_at=timestamp,
-        avatar_url="",  # TODO: Handle user icons
-    )
-
+def create_user(req: NewUserRequest) -> str:
     query = """
        CREATE (u:User {
-           id: $id,
+           id: randomUUID(),
            name: $name,
            email: $email,
-           created_at: datetime($created_at),
-           updated_at: datetime($updated_at),
-           avatar_url: $avatar_url
+           created_at: timestamp(),
+           updated_at: timestamp(),
+           avatar_url: ""
        })
        RETURN u
        """
 
-    user_prepared = user.dict()
-    user_prepared["id"] = user.id.hex
-
-    result = None
     with driver.session() as session:
-        result = session.run(query, user_prepared).single()
+        data = session.run(query, req.dict()).single()
 
-    if result is None:
+    if not data:
         raise HTTPException(status_code=500, detail="Failed to create user")
 
-    return result['u']['id']
+    return data['u']['id']
 
 
 @app.get("/users/{user_id}", response_model=User)
-def get_user(user_id: UUID4) -> User:
+def get_user(user_id: UUID) -> User:
     query = """
     MATCH (u:User {id: $user_id})
     RETURN u
     """
 
-    result = None
     with driver.session() as session:
-        result = session \
+        data = session \
                 .run(query, {"user_id": user_id.hex}) \
                 .single()
 
-    if result is None:
-        raise HTTPException(404, "User not found")
+    if not data:
+        raise HTTPException(status_code=404, detail="User not found")
 
     return User(
-        id=UUID4(result[id]),
-        name=result['name'],
-        email=result['email'],
-        created_at=result['created_at'].to_native(),
-        updated_at=result['updated_at'].to_native(),
-        avatar_url=result['avatar_url'],
+        id=UUID(data[id]),
+        name=data['name'],
+        email=data['email'],
+        created_at=datetime.fromtimestamp(data['created_at'] / 1000.0),
+        updated_at=datetime.fromtimestamp(data['updated_at'] / 1000.0),
+        avatar_url=data['avatar_url'],
     )
 
 
@@ -103,17 +86,17 @@ def list_users() -> List[User]:
     RETURN u
     """
 
-    users = []
+    users: List[User] = []
     with driver.session() as session:
         for record in session.run(query):
             data = record['u']
 
             user = User(
-                id=UUID4(data['id']),
+                id=UUID(data['id']),
                 name=data['name'],
                 email=data['email'],
-                created_at=data['created_at'].to_native(),
-                updated_at=data['updated_at'].to_native(),
+                created_at=datetime.fromtimestamp(data['created_at'] / 1000.0),
+                updated_at=datetime.fromtimestamp(data['updated_at'] / 1000.0),
                 avatar_url=data['avatar_url'],
             )
 
@@ -123,7 +106,7 @@ def list_users() -> List[User]:
 
 
 class Point(BaseModel):
-    id: UUID4
+    id: UUID
     coordinates: dict
     description: str
     availability: float
@@ -137,16 +120,9 @@ class CreatePointRequest(BaseModel):
 
 @app.post("/points/new", response_model=str)
 def create_point(req: CreatePointRequest) -> str:
-    point = Point(
-        id=uuid.uuid4(),
-        coordinates=req.coordinates,
-        description=req.description,
-        availability=req.availability,
-    )
-
     query = """
        CREATE (p:Point {
-           id: $id,
+           id: randomUUID(),
            coordinates: point({latitude: $lat, longitude: $lon}),
            description: $description,
            availability: $availability
@@ -154,13 +130,12 @@ def create_point(req: CreatePointRequest) -> str:
        RETURN p
        """
 
-    point_prepared = point.dict()
-    point_prepared["id"] = point.id.hex
-    point_prepared["lat"] = point.coordinates["coordinates"][0]
-    point_prepared["lon"] = point.coordinates["coordinates"][1]
+    point = req.dict()
+    point["lat"] = req.coordinates["coordinates"][0]
+    point["lon"] = req.coordinates["coordinates"][1]
 
     with driver.session() as session:
-        data = session.run(query, point_prepared).single()
+        data = session.run(query, point).single()
 
     if not data:
         raise HTTPException(status_code=500, detail="Failed to create point")
@@ -169,7 +144,7 @@ def create_point(req: CreatePointRequest) -> str:
 
 
 @app.get("/points/{point_id}", response_model=Point)
-def get_point(point_id: UUID4) -> Point:
+def get_point(point_id: UUID) -> Point:
     query = """
     MATCH (p:Point {id: $point_id})
     RETURN p
@@ -178,22 +153,23 @@ def get_point(point_id: UUID4) -> Point:
     with driver.session() as session:
         data = session \
                 .run(query, {"point_id": point_id.hex}) \
-                .single()['p']
+                .single()
 
     if not data:
         raise HTTPException(status_code=404, detail="Failed to find point")
 
+    point = data['p']
     return Point(
-        id=UUID4(data['id']),
+        id=UUID(point['id']),
         coordinates={
             "type": "Point",
             "coordinates": [
-                data['coordinates'][0],
-                data['coordinates'][1],
+                point['coordinates'][0],
+                point['coordinates'][1],
             ],
         },
-        description=data['description'],
-        availability=float(data['availability']),
+        description=point['description'],
+        availability=float(point['availability']),
     )
 
 
@@ -204,13 +180,13 @@ def list_points() -> List[Point]:
     RETURN p
     """
 
-    points = []
+    points: List[Point] = []
     with driver.session() as session:
         for record in session.run(query):
             data = record['p']
 
             point = Point(
-                id=UUID4(data['id']),
+                id=UUID(data['id']),
                 coordinates={
                     "type":
                     "Point",
@@ -229,27 +205,20 @@ def list_points() -> List[Point]:
 
 
 class Route(BaseModel):
-    id: UUID4
-    point_ids: List[UUID4]
-    author_id: UUID4
+    id: UUID
+    point_ids: List[UUID]
+    author_id: UUID
     popularity_score: float
 
 
 class CreateRouteRequest(BaseModel):
-    point_ids: List[UUID4]
-    author: UUID4
+    point_ids: List[UUID]
+    author: UUID
     popularity_score: float
 
 
-@app.post("/routes/new", response_model=UUID4)
-def create_route(req: CreateRouteRequest) -> UUID4:
-    route = Route(
-        id=uuid.uuid4(),
-        point_ids=req.point_ids,
-        author_id=req.author,
-        popularity_score=req.popularity_score,
-    )
-
+@app.post("/routes/new", response_model=UUID)
+def create_route(req: CreateRouteRequest) -> UUID:
     query = """
 MATCH (a:User {id: $author_id})
 WITH a
@@ -260,30 +229,29 @@ MATCH (p:Point {id: pid})
 WITH a, collect(p) AS points
 WHERE size(points) = size($point_ids)
 
-CREATE (r:Route {id: $id, popularity_score: $popularity_score})
+CREATE (r:Route {id: randomUUID(), popularity_score: $popularity_score})
 CREATE (r)-[:CREATED_BY]->(a)
 FOREACH (point IN points | CREATE (r)-[:HAS_POINT]->(point))
 RETURN r
        """
 
-    route_prepared = route.dict()
-    route_prepared['id'] = route.id.hex
-    route_prepared['author_id'] = route.author_id.hex
-    route_prepared['point_ids'] = \
-        [point_id.hex for point_id in route.point_ids]
+    route = {
+        "author_id": str(req.author),
+        "point_ids": list(map(str, req.point_ids)),
+        "popularity_score": req.popularity_score,
+    }
 
-    data = None
     with driver.session() as session:
-        data = session.run(query, route_prepared).single()
+        data = session.run(query, route).single()
 
-    if data is None:
+    if not data:
         raise HTTPException(status_code=500, detail="Internal error")
 
-    return UUID4(data['r']['id'])
+    return UUID(data['r']['id'])
 
 
 @app.get("/routes/{route_id}", response_model=Route)
-def get_route(route_id: UUID4) -> Route:
+def get_route(route_id: UUID) -> Route:
     query = """
     MATCH (r:Route {id: $route_id})
     OPTIONAL MATCH (r)-[:HAS_POINT]->(p:Point)
@@ -292,19 +260,16 @@ def get_route(route_id: UUID4) -> Route:
     """
 
     with driver.session() as session:
-        data = session.run(query, {"route_id": route_id.hex}).single()
+        data = session.run(query, {"route_id": str(route_id)}).single()
 
-    if not data or data.get('r') is None:
+    if not data:
         raise HTTPException(status_code=404, detail="Not found")
 
-    route = data['r']
-    points = data['points']
-
     return Route(
-        id=UUID4(route['id']),
-        author_id=UUID4(data['author_id']),
-        point_ids=[UUID4(point_id) for point_id in points['point_ids']],
-        popularity_score=float(route['popularity_score']),
+        id=UUID(data['r']['id']),
+        author_id=UUID(data['author_id']),
+        point_ids=[UUID(point_id) for point_id in data['points']['point_ids']],
+        popularity_score=float(data['r']['popularity_score']),
     )
 
 
@@ -327,9 +292,9 @@ def list_routes() -> List[Route]:
 
             routes.append(
                 Route(
-                    id=UUID4(route['id']),
-                    author_id=UUID4(author),
-                    point_ids=[UUID4(point) for point in points],
+                    id=UUID(route['id']),
+                    author_id=UUID(author),
+                    point_ids=[UUID(point) for point in points],
                     popularity_score=float(route['popularity_score']),
                 ))
 
@@ -337,7 +302,7 @@ def list_routes() -> List[Route]:
 
 
 class Lake(BaseModel):
-    id: UUID4
+    id: UUID
     name: str
     description: str
     coordinates_boundary: dict
@@ -359,30 +324,18 @@ class CreateLakeRequest(BaseModel):
     outflowing_rivers: List[str]
 
 
-@app.post("/lakes/new", response_model=UUID4)
-def create_lake(req: CreateLakeRequest) -> UUID4:
-    lake = Lake(
-        id=uuid.uuid4(),
-        name=req.name,
-        description=req.description,
-        coordinates_boundary=req.coordinates_boundary,
-        availability_score=req.availability,
-        max_depth=req.max_depth,
-        salinity=req.salinity,
-        inflowing_rivers=req.inflowing_rivers,
-        outflowing_rivers=req.outflowing_rivers,
-    )
-
+@app.post("/lakes/new", response_model=UUID)
+def create_lake(req: CreateLakeRequest) -> UUID:
     query = """
 CREATE (l:Lake {
-    id: $id,
+    id: randomUUID(),
     name: $name,
     description: $description,
     coordinates_boundary: [c IN $coordinates_boundary | point({
         longitude: c.lon,
         latitude: c.lat
     })],
-    availability_score: $availability_score,
+    availability_score: $availability,
     max_depth: $max_depth,
     inflowing_rivers: $inflowing_rivers,
     outflowing_rivers: $outflowing_rivers,
@@ -391,37 +344,34 @@ CREATE (l:Lake {
 RETURN l
        """
 
-    lake_prepared = lake.dict()
-    lake_prepared['id'] = lake.id.hex
-    lake_prepared['coordinates_boundary'] = \
+    lake = req.dict()
+    lake['coordinates_boundary'] = \
         [{"lon": point[0], "lat": point[1]}
-            for point in lake.coordinates_boundary['coordinates'][0]]
+            for point in req.coordinates_boundary['coordinates'][0]]
 
-    result = None
     with driver.session() as session:
-        result = session.run(query, lake_prepared).single()
+        data = session.run(query, lake).single()
 
-    if result is None:
+    if not data:
         raise HTTPException(status_code=500, detail="Failed to create lake")
 
-    return UUID4(result['l']['id'])
+    return UUID(data['l']['id'])
 
 
 @app.get("/lakes/{lake_id}", response_model=Lake)
-def get_lake(lake_id: UUID4) -> Lake:
+def get_lake(lake_id: UUID) -> Lake:
     query = """
     MATCH (l:Lake {id: $lake_id})
     RETURN l
     """
 
-    result = None
     with driver.session() as session:
-        result = session.run(query, {"lake_id": lake_id.hex}).single()
+        data = session.run(query, {"lake_id": str(lake_id)}).single()
 
-    if result is None:
+    if not data:
         raise HTTPException(status_code=404, detail="Lake not found")
 
-    lake = result['l']
+    lake = data['l']
     return Lake(
         id=lake['id'],
         name=lake['name'],
@@ -475,32 +425,32 @@ def list_lakes() -> List[Lake]:
 
 
 class SupportTicket(BaseModel):
-    id: UUID4
-    author_id: UUID4
+    id: UUID
+    author_id: UUID
     subject: str
     text: str
     created_at: datetime
-    route_reference: Optional[UUID4] = None
-    lake_reference: Optional[UUID4] = None
+    route_reference: Optional[UUID] = None
+    lake_reference: Optional[UUID] = None
 
 
 class CreateSupportTicketRequest(BaseModel):
-    author_id: UUID4
+    author_id: UUID
     subject: str
     text: str
-    route_reference: Optional[UUID4] = None
-    lake_reference: Optional[UUID4] = None
+    route_reference: Optional[UUID] = None
+    lake_reference: Optional[UUID] = None
 
 
-@app.post("/support-tickets/new", response_model=UUID4)
-def create_support_ticket(req: CreateSupportTicketRequest) -> UUID4:
+@app.post("/support-tickets/new", response_model=UUID)
+def create_support_ticket(req: CreateSupportTicketRequest) -> UUID:
     query = """
 MATCH (author:User {id: $author_id})
 CREATE (ticket:SupportTicket {
     id: randomUUID(),
     subject: $subject,
     text: $text,
-    created_at: datetime($created_at)
+    created_at: timestamp()
 })
 CREATE (ticket)-[:CREATED_BY]->(author)
 WITH ticket
@@ -514,22 +464,20 @@ FOREACH (_ IN CASE WHEN lake IS NULL THEN [] ELSE [1] END |
 RETURN ticket AS t
     """
 
-    ticket_prepared = req.dict()
-    ticket_prepared['author_id'] = req.author_id.hex
-    ticket_prepared['created_at'] = datetime.now(timezone.utc)
+    ticket = req.dict()
+    ticket['author_id'] = str(req.author_id)
 
-    data = None
     with driver.session() as session:
-        data = session.run(query, ticket_prepared).single()
+        data = session.run(query, ticket).single()
 
-    if data is None:
+    if not data:
         raise HTTPException(status_code=500, detail="Failed to create ticket")
 
     return data['t']['id']
 
 
 @app.get("/support-tickets/{ticket_id}", response_model=SupportTicket)
-def get_support_ticket(ticket_id: UUID4) -> SupportTicket:
+def get_support_ticket(ticket_id: UUID) -> SupportTicket:
     query = """
 MATCH (ticket:SupportTicket {id: $ticket_id})
 OPTIONAL MATCH (ticket)-[:CREATED_BY]->(author:User)
@@ -545,19 +493,18 @@ RETURN
   lake.id AS lake_reference
     """
 
-    data = None
     with driver.session() as session:
         data = session.run(query, {"ticket_id": ticket_id.hex}).single()
 
-    if data is None:
+    if not data:
         raise HTTPException(status_code=404, detail="Failed to find ticket")
 
     return SupportTicket(
-        id=UUID4(data['id']),
+        id=UUID(data['id']),
         author_id=data['author_id'],
         subject=data['subject'],
         text=data['text'],
-        created_at=data['created_at'].to_native(),
+        created_at=datetime.fromtimestamp(data['created_at'] / 1000.0),
         route_reference=data.get('route_reference'),
         lake_reference=data.get('lake_reference'),
     )
@@ -580,16 +527,17 @@ RETURN
   lake.id AS lake_reference
     """
 
-    tickets = []
+    tickets: List[SupportTicket] = []
     with driver.session() as session:
         for record in session.run(query):
             tickets.append(
                 SupportTicket(
-                    id=UUID4(record['id']),
+                    id=UUID(record['id']),
                     author_id=record['author_id'],
                     subject=record['subject'],
                     text=record['text'],
-                    created_at=record['created_at'].to_native(),
+                    created_at=datetime.fromtimestamp(record['created_at'] /
+                                                      1000.0),
                     route_reference=record.get('route_reference'),
                     lake_reference=record.get('lake_reference'),
                 ))
