@@ -20,7 +20,8 @@
 ## Запуск задания
 
 ```bash
-$ docker-compose up -f compose.yml
+docker-compose build && docker-compose up
 ```
 
-Прототип находится по Адресу `localhost:8080/admin`
+Прототип находится по Адресу `localhost:8080`
+Интерфейс администратора: `localhost:8888`
