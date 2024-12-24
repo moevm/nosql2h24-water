@@ -17,11 +17,9 @@ services:
   frontend:
     build:
       context: ./frontendReact
-      dockerfile: Containerfile
+      dockerfile: Dockerfile
     ports:
       - '8080:80'  # Map host port 8080 to container port 8000 (Deno app)
-    volumes:
-      - ./frontend:/app  # Mount the local frontend directory to /app in the container
     depends_on:
       - backend
     networks:
@@ -36,7 +34,7 @@ services:
     volumes:
       - ./backend:/app  # Mount the local backend directory to /app in the container
     depends_on:
-      - neo4j
+      - db
     environment:
       - NEO4J_URI=bolt://neo4j:7687
       - NEO4J_USER=neo4j
@@ -44,11 +42,8 @@ services:
     networks:
       - app-network
 
-  neo4j:
+  db:
     image: neo4j:latest
-    ports:
-      - '7474:7474'  # HTTP access
-      - '7687:7687'  # Bolt access
     volumes:
       - neo4j_data:/data  # Persist database data
       - neo4j_logs:/logs  # Persist database logs
