@@ -107,15 +107,19 @@ def list_users() -> List[User]:
 
 class Point(BaseModel):
     id: UUID
-    coordinates: dict
+    name: str
     description: str
-    availability: float
+    address: str
+    coordinates: dict
+    rating: int
 
 
 class CreatePointRequest(BaseModel):
-    coordinates: dict
+    name: str
     description: str
-    availability: float
+    address: str
+    coordinates: dict
+    rating: int
 
 
 @app.post("/points/new", response_model=str)
@@ -123,9 +127,11 @@ def create_point(req: CreatePointRequest) -> str:
     query = """
        CREATE (p:Point {
            id: randomUUID(),
-           coordinates: point({latitude: $lat, longitude: $lon}),
+           name: $name,
            description: $description,
-           availability: $availability
+           address: $address,
+           coordinates: point({latitude: $lat, longitude: $lon}),
+           rating: $rating
        })
        RETURN p
        """
