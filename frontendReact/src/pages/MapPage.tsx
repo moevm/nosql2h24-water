@@ -1,20 +1,14 @@
-import React, { useState, useEffect } from "react";
-import {
-  MapContainer,
-  TileLayer,
-  Marker,
-  Popup,
-  useMap,
-} from "react-leaflet";
+import React, { useEffect, useState } from "react";
+import { MapContainer, Marker, Popup, TileLayer, useMap } from "react-leaflet";
 import L from "leaflet";
 import {
   Box,
   Button,
-  TextField,
-  Typography,
-  Slider,
   List,
   ListItem,
+  Slider,
+  TextField,
+  Typography,
 } from "@mui/material";
 import "leaflet/dist/leaflet.css";
 
@@ -26,7 +20,7 @@ const customIcon = L.icon({
 });
 
 interface MarkerData {
-  id: number;
+  id: string;
   name: string;
   lat: number;
   lng: number;
@@ -46,32 +40,21 @@ const ResizeHandler = () => {
 };
 
 const MapPage: React.FC = () => {
-  const [markers, setMarkers] = useState<MarkerData[]>([
-    {
-      id: 1,
-      name: "Центральный маркер",
-      lat: 59.9343,
-      lng: 30.3351,
-      address: "Центр Санкт-Петербурга",
-      rating: 5,
-    },
-    {
-      id: 2,
-      name: "Маркер на юге",
-      lat: 59.900,
-      lng: 30.3351,
-      address: "Южный район",
-      rating: 4,
-    },
-    {
-      id: 3,
-      name: "Маркер на севере",
-      lat: 59.970,
-      lng: 30.3351,
-      address: "Северный район",
-      rating: 3,
-    },
-  ]);
+  const [markers, setMarkers] = useState<MarkerData[]>([]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const signal = controller.signal;
+
+    fetch(`http://localhost:8000/points`, { signal })
+      .then((data) => data.json())
+      .then((data) => setMarkers(data))
+      .catch((e) => console.error(e));
+
+    return () => {
+      controller.abort();
+    };
+  }, []);
 
   const [search, setSearch] = useState("");
   const [minRating, setMinRating] = useState(1);
@@ -84,13 +67,13 @@ const MapPage: React.FC = () => {
       (marker) =>
         marker.name.toLowerCase().includes(search.toLowerCase()) &&
         marker.rating >= minRating &&
-        marker.rating <= maxRating
+        marker.rating <= maxRating,
     );
     setFilteredMarkers(filtered);
   };
 
   // Удаление маркеров
-  const handleDeleteMarker = (id: number) => {
+  const handleDeleteMarker = (id: string) => {
     const updatedMarkers = markers.filter((marker) => marker.id !== id);
     setMarkers(updatedMarkers);
     setFilteredMarkers(updatedMarkers);
@@ -131,7 +114,12 @@ const MapPage: React.FC = () => {
           max={5}
           sx={{ marginBottom: 2 }}
         />
-        <Button variant="contained" color="primary" onClick={handleSearch} fullWidth>
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={handleSearch}
+          fullWidth
+        >
           Применить фильтры
         </Button>
       </Box>
@@ -214,4 +202,3 @@ const MapPage: React.FC = () => {
 };
 
 export default MapPage;
-
