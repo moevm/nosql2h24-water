@@ -3,12 +3,12 @@ version: '3.9'
 services:
   admin:
     build:
-      context: ./frontend
+      context: ./admin
       dockerfile: Containerfile
     ports:
       - '8888:8000'  # Map host port 8888 to container port 8000 (Deno app)
     volumes:
-      - ./frontend:/app:ro  # Mount the local frontend directory to /app in the container
+      - ./admin:/app:ro  # Mount the local frontend directory to /app in the container
     depends_on:
       - backend
     networks:
