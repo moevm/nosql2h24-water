@@ -16,9 +16,10 @@ interface User {
 
 interface Point {
   id: string;
-  coordinates: GeoJsonPoint;
+  name: string;
   description: string;
-  availability: number;
+  coordinates: GeoJsonPoint;
+  rating: number;
 }
 
 interface Route {
