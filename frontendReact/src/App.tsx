@@ -7,19 +7,21 @@ import MapPage from "./pages/MapPage.tsx";
 import Profile from "./pages/Profile.tsx";
 import ImportExport from "./pages/ImportExport.tsx";
 import Statistics from "./pages/Statistics.tsx";
+import SupportStatistics from "./pages/SupportStatistics.tsx";
 import Support from "./pages/Support.tsx";
 import NewPassword from "./pages/NewPassword.tsx";
 import ForgotPassword from "./pages/ForgotPassword.tsx";
+import AttributeSearch from "./pages/AttributeSearch.tsx";
 import Settings from "./pages/Settings.tsx";
 
 const App: React.FC = () => {
   return (
     <Router>
       <Routes>
-        <Route path="/map" element={<Login />} />
+        <Route path="/" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/main-menu" element={<MainMenu />} />
-        <Route path="/" element={<MapPage />} />
+        <Route path="/map" element={<MapPage />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/import-export" element={<ImportExport />} />
         <Route path="/statistics" element={<Statistics />} />
@@ -27,6 +29,8 @@ const App: React.FC = () => {
          <Route path="/new-password" element={<NewPassword />} />
   	<Route path="/forgot-password" element={<ForgotPassword />} />	
         <Route path="/settings" element={<Settings />} />
+        <Route path="/support-statistics" element={<SupportStatistics />} />
+        <Route path="/attribute-search" element={<AttributeSearch />} />
       </Routes>
     </Router>
   );

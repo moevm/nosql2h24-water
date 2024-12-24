@@ -16,8 +16,9 @@ import {
   List,
   ListItem,
 } from "@mui/material";
+import "leaflet/dist/leaflet.css";
 
-// Настройка кастомной иконки для маркеров
+// Настройка кастомной иконки
 const customIcon = L.icon({
   iconUrl: "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png",
   iconSize: [25, 41],
@@ -38,9 +39,7 @@ const ResizeHandler = () => {
   const map = useMap();
 
   useEffect(() => {
-    setTimeout(() => {
-      map.invalidateSize(); // Пересчёт размеров карты
-    }, 100);
+    map.invalidateSize(); // Пересчёт размеров карты
   }, [map]);
 
   return null;
@@ -50,26 +49,26 @@ const MapPage: React.FC = () => {
   const [markers, setMarkers] = useState<MarkerData[]>([
     {
       id: 1,
-      name: "Озеро 1",
+      name: "Центральный маркер",
       lat: 59.9343,
       lng: 30.3351,
-      address: "Адрес 1",
-      rating: 4,
-    },
-    {
-      id: 2,
-      name: "Озеро 2",
-      lat: 59.948,
-      lng: 30.313,
-      address: "Адрес 2",
+      address: "Центр Санкт-Петербурга",
       rating: 5,
     },
     {
+      id: 2,
+      name: "Маркер на юге",
+      lat: 59.900,
+      lng: 30.3351,
+      address: "Южный район",
+      rating: 4,
+    },
+    {
       id: 3,
-      name: "Озеро 3",
-      lat: 59.960,
-      lng: 30.300,
-      address: "Адрес 3",
+      name: "Маркер на севере",
+      lat: 59.970,
+      lng: 30.3351,
+      address: "Северный район",
       rating: 3,
     },
   ]);
@@ -98,18 +97,15 @@ const MapPage: React.FC = () => {
   };
 
   return (
-    <Box display="flex" flexDirection="column" height="100vh" position="relative">
+    <Box display="flex" flexDirection="row" height="100vh">
       {/* Панель поиска и фильтров */}
       <Box
-        position="absolute"
-        top={16}
-        left={16}
-        zIndex={1000}
+        width="300px"
         padding={2}
         bgcolor="white"
         borderRadius={2}
         boxShadow="0px 4px 10px rgba(0, 0, 0, 0.1)"
-        maxWidth={300}
+        zIndex={1000}
       >
         <Typography variant="h6" gutterBottom>
           Поиск
@@ -141,16 +137,27 @@ const MapPage: React.FC = () => {
       </Box>
 
       {/* Карта */}
-      <Box flex={1} display="flex" position="relative" width="100%">
+      <Box flex={1} position="relative">
         <MapContainer
           center={[59.9343, 30.3351]}
           zoom={12}
-          style={{ height: "100%", width: "100%" }}
+          style={{
+            height: "100vh",
+            width: "100%",
+            background: "white",
+          }}
+          maxBounds={[
+            [59.7, 29.9], // Левый нижний угол
+            [60.2, 30.7], // Правый верхний угол
+          ]}
+          maxBoundsViscosity={1.0}
         >
           <ResizeHandler />
           <TileLayer
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             attribution='&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
+            tileSize={256}
+            zoomOffset={0}
           />
           {filteredMarkers.map((marker) => (
             <Marker
