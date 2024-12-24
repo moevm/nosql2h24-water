@@ -8,7 +8,7 @@ services:
     ports:
       - '8888:8000'  # Map host port 8888 to container port 8000 (Deno app)
     volumes:
-      - ./frontend:/app  # Mount the local frontend directory to /app in the container
+      - ./frontend:/app:ro  # Mount the local frontend directory to /app in the container
     depends_on:
       - backend
     networks:
@@ -19,7 +19,7 @@ services:
       context: ./frontendReact
       dockerfile: Dockerfile
     ports:
-      - '8080:80'  # Map host port 8080 to container port 8000 (Deno app)
+      - '8080:80'
     depends_on:
       - backend
     networks:
@@ -32,7 +32,7 @@ services:
     ports:
       - '8000:8000'  # Map host port 8000 to container port 8000 (FastAPI app)
     volumes:
-      - ./backend:/app  # Mount the local backend directory to /app in the container
+      - ./backend:/app:ro  # Mount the local backend directory to /app in the container
     depends_on:
       - db
     environment:
