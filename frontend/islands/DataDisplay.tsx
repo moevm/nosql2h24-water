@@ -84,7 +84,6 @@ type FormData = {
 function handleAddEntry(
   category: DataCategory,
   formData: FormData,
-  setCategory: Dispatch<StateUpdater<DataCategory>>,
   setFormData: Dispatch<StateUpdater<FormData>>,
 ) {
   fetch(`http://localhost:8000/${category}/new`, {
@@ -95,7 +94,6 @@ function handleAddEntry(
     body: JSON.stringify(formData),
   })
     .then(() => setFormData({}))
-    .then(() => setCategory(category + ""))
     .catch((e) => console.error(e));
 }
 
@@ -155,9 +153,9 @@ function DataDisplay() {
       </div>
 
       {addEntryShown &&
-        addEntryForm(category, formData, setCategory, setFormData)}
+        addEntryForm(category, formData, setFormData)}
 
-      <DataTable category={category} />
+      {!addEntryShown && <DataTable category={category} />}
     </div>
   );
 }
@@ -165,7 +163,6 @@ function DataDisplay() {
 function addEntryForm(
   category: DataCategory,
   formData: FormData,
-  setCategory: Dispatch<StateUpdater<DataCategory>>,
   setFormData: Dispatch<StateUpdater<FormData>>,
 ) {
   return (
@@ -173,8 +170,7 @@ function addEntryForm(
       {renderInputs(category, formData, setFormData)}
 
       <button
-        onClick={() =>
-          handleAddEntry(category, formData, setCategory, setFormData)}
+        onClick={() => handleAddEntry(category, formData, setFormData)}
         class="bg-nord8 text-nord0 px-3 py-1 rounded focus:outline-none focus:ring-2 focus:ring-nord8 mb-6"
       >
         Добавить
